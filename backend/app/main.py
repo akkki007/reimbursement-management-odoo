@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.dependencies import connect_db, disconnect_db
+from app.routers import auth, users
 
 settings = get_settings()
 
@@ -51,6 +52,11 @@ async def general_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"detail": "An internal error occurred"},
     )
+
+
+# Routers
+app.include_router(auth.router)
+app.include_router(users.router)
 
 
 # Health check
