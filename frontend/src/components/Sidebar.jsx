@@ -28,6 +28,7 @@ export default function Sidebar() {
     navigate('/login');
   };
 
+  const isEmployee = user?.role === 'EMPLOYEE';
   const isAdmin = user?.role === 'ADMIN';
   const isManagerOrAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
@@ -48,15 +49,19 @@ export default function Sidebar() {
           <LayoutDashboard size={20} strokeWidth={1.75} />
         </NavLink>
 
-        <NavLink to="/expenses/submit" className={iconNavClass} title="Submit expense">
-          <PlusCircle size={20} strokeWidth={1.75} />
-        </NavLink>
+        {isEmployee && (
+          <>
+            <NavLink to="/expenses/submit" className={iconNavClass} title="Submit expense">
+              <PlusCircle size={20} strokeWidth={1.75} />
+            </NavLink>
 
-        <NavLink to="/expenses/scan" className={iconNavClass} title="Scan receipt">
-          <ScanLine size={20} strokeWidth={1.75} />
-        </NavLink>
+            <NavLink to="/expenses/scan" className={iconNavClass} title="Scan receipt">
+              <ScanLine size={20} strokeWidth={1.75} />
+            </NavLink>
+          </>
+        )}
 
-        <NavLink to="/expenses" className={iconNavClass} title="My expenses">
+        <NavLink to="/expenses" className={iconNavClass} title={isEmployee ? 'My expenses' : 'Team expenses'}>
           <Receipt size={20} strokeWidth={1.75} />
         </NavLink>
 

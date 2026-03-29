@@ -82,7 +82,12 @@ export default function ApprovalDetail() {
           {expense.receipt_url && (
             <div className="flex items-center gap-2 px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-sm">
               <Paperclip size={16} className="text-gray-400" />
-              <a href={expense.receipt_url} target="_blank" rel="noopener noreferrer" className="text-navy font-medium hover:underline">
+              <a
+                href={`${(import.meta.env.VITE_API_URL || '').replace(/\/api$/, '')}${expense.receipt_url}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-navy font-medium hover:underline"
+              >
                 View attached receipt
               </a>
             </div>

@@ -4,7 +4,7 @@ import Layout from '../../components/Layout';
 import { useAuth } from '../../context/AuthContext';
 import client from '../../api/client';
 import { EXPENSE_CATEGORIES } from '../../utils/constants';
-import { Camera, Upload, ScanLine, Send, Loader2 } from 'lucide-react';
+import { Camera, Upload, ScanLine, Send, Save, Loader2 } from 'lucide-react';
 
 const COMMON_CURRENCIES = [
   'USD', 'EUR', 'GBP', 'INR', 'CAD', 'AUD', 'JPY', 'CNY', 'CHF', 'SGD',
@@ -20,6 +20,7 @@ export default function ScanReceipt() {
   const [preview, setPreview] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [error, setError] = useState('');
 
@@ -76,6 +77,16 @@ export default function ScanReceipt() {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  const buildPayload = () => ({
+    amount: parseFloat(form.amount),
+    currency: form.currency,
+    category: form.category,
+    description: form.description,
+    expense_date: new Date(form.expense_date).toISOString(),
+    is_manager_approver: false,
+    ocr_vendor_name: form.vendor_name || null,
+  });
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.amount || !form.category) {
@@ -85,20 +96,29 @@ export default function ScanReceipt() {
     setSubmitting(true);
     setError('');
     try {
-      await client.post('/expenses', {
-        amount: parseFloat(form.amount),
-        currency: form.currency,
-        category: form.category,
-        description: form.description,
-        expense_date: new Date(form.expense_date).toISOString(),
-        is_manager_approver: false,
-        ocr_vendor_name: form.vendor_name || null,
-      });
+      await client.post('/expenses', buildPayload());
       navigate('/expenses');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to submit');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!form.amount || !form.category) {
+      setError('Amount and category are required');
+      return;
+    }
+    setSavingDraft(true);
+    setError('');
+    try {
+      await client.post('/expenses/draft', buildPayload());
+      navigate('/expenses');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to save draft');
+    } finally {
+      setSavingDraft(false);
     }
   };
 
@@ -275,14 +295,25 @@ export default function ScanReceipt() {
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex items-center justify-center gap-2 w-full py-2.5 bg-primary-400 hover:bg-primary-500 text-navy font-semibold rounded-lg transition-colors text-sm disabled:opacity-50"
-            >
-              <Send size={16} />
-              {submitting ? 'Submitting...' : 'Submit expense'}
-            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                disabled={savingDraft || submitting}
+                className="flex items-center justify-center gap-2 flex-1 py-2.5 border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold rounded-lg transition-colors text-sm disabled:opacity-50"
+              >
+                <Save size={16} />
+                {savingDraft ? 'Saving...' : 'Save as draft'}
+              </button>
+              <button
+                type="submit"
+                disabled={submitting || savingDraft}
+                className="flex items-center justify-center gap-2 flex-1 py-2.5 bg-primary-400 hover:bg-primary-500 text-navy font-semibold rounded-lg transition-colors text-sm disabled:opacity-50"
+              >
+                <Send size={16} />
+                {submitting ? 'Submitting...' : 'Submit expense'}
+              </button>
+            </div>
           </form>
         </div>
       </div>

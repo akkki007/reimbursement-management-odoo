@@ -38,9 +38,10 @@ model User {
   firstName    String
   lastName     String
   role         Role     @default(EMPLOYEE)
-  isActive     Boolean  @default(true)
-  companyId    String
-  managerId    String?
+  isActive           Boolean  @default(true)
+  mustChangePassword Boolean  @default(false)
+  companyId          String
+  managerId          String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

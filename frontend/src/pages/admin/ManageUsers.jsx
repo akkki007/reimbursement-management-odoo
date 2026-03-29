@@ -96,6 +96,7 @@ export default function ManageUsers() {
 function UserRow({ user, allUsers, managers, onUpdate }) {
   const [editingRole, setEditingRole] = useState(false);
   const [editingManager, setEditingManager] = useState(false);
+  const [sendingPassword, setSendingPassword] = useState(false);
   const managerName = user.manager_id
     ? (() => {
         const m = allUsers.find((u) => u.id === user.manager_id);
@@ -119,6 +120,19 @@ function UserRow({ user, allUsers, managers, onUpdate }) {
       onUpdate();
     } catch { /* ignore */ }
     setEditingManager(false);
+  };
+
+  const handleSendPassword = async () => {
+    if (!window.confirm(`Send a new password to ${user.email}?`)) return;
+    setSendingPassword(true);
+    try {
+      await client.post(`/users/${user.id}/send-password`);
+      alert('Password sent successfully!');
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to send password.');
+    } finally {
+      setSendingPassword(false);
+    }
   };
 
   const handleDeactivate = async () => {
@@ -205,12 +219,21 @@ function UserRow({ user, allUsers, managers, onUpdate }) {
       </td>
       <td className="px-6 py-4">
         {user.is_active && (
-          <button
-            onClick={handleDeactivate}
-            className="text-sm text-red-500 hover:text-red-700 font-medium"
-          >
-            Deactivate
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSendPassword}
+              disabled={sendingPassword}
+              className="text-sm text-primary-600 hover:text-primary-800 font-medium disabled:opacity-50"
+            >
+              {sendingPassword ? 'Sending...' : 'Send password'}
+            </button>
+            <button
+              onClick={handleDeactivate}
+              className="text-sm text-red-500 hover:text-red-700 font-medium"
+            >
+              Deactivate
+            </button>
+          </div>
         )}
       </td>
     </tr>
@@ -251,10 +274,9 @@ function CreateUserModal({ managers, onClose, onCreated }) {
     setError('');
     setLoading(true);
     try {
-      await client.post('/users', {
-        ...form,
-        manager_id: form.manager_id || null,
-      });
+      const payload = { ...form, manager_id: form.manager_id || null };
+      if (!payload.password) delete payload.password;
+      await client.post('/users', payload);
       onCreated();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create user');
@@ -316,15 +338,17 @@ function CreateUserModal({ managers, onClose, onCreated }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Password <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
             <input
               type="password"
               name="password"
-              required
-              minLength={8}
+              minLength={form.password ? 8 : undefined}
               value={form.password}
               onChange={handleChange}
               className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-400 text-sm"
+              placeholder="Auto-generated if left blank"
             />
           </div>
 

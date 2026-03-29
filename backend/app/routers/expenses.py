@@ -1,9 +1,12 @@
+import uuid
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
 
 from app.dependencies import db
 from app.middleware.auth_middleware import get_current_user
+from app.middleware.role_middleware import require_role
 from app.schemas.expense import CreateExpenseRequest, UpdateExpenseRequest
 from app.services.expense_service import (
     create_expense,
@@ -49,7 +52,7 @@ async def get_expense_stats(current_user=Depends(get_current_user)):
 @router.post("/")
 async def create_and_submit_expense(
     req: CreateExpenseRequest,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("EMPLOYEE")),
 ):
     """Create an expense and immediately submit it for approval."""
     expense = await create_expense(
@@ -76,7 +79,7 @@ async def create_and_submit_expense(
 @router.post("/draft")
 async def save_draft_expense(
     req: CreateExpenseRequest,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("EMPLOYEE")),
 ):
     """Save an expense as draft without submitting."""
     expense = await create_expense(
@@ -100,7 +103,7 @@ async def save_draft_expense(
 @router.post("/{expense_id}/submit")
 async def submit_draft(
     expense_id: str,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("EMPLOYEE")),
 ):
     """Submit a previously saved draft expense."""
     submitted = await submit_expense(expense_id, current_user.id)
@@ -250,10 +253,33 @@ async def update_expense(
     return serialize_expense(updated)
 
 
+@router.post("/upload-receipt")
+async def upload_receipt(
+    file: UploadFile = File(...),
+    current_user=Depends(require_role("EMPLOYEE")),
+):
+    """Upload a receipt file and return its URL."""
+    if not file.content_type or not (
+        file.content_type.startswith("image/") or file.content_type == "application/pdf"
+    ):
+        raise HTTPException(status_code=400, detail="Only images and PDFs are accepted")
+
+    ext = Path(file.filename).suffix if file.filename else ".bin"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    uploads_dir = Path(__file__).resolve().parent.parent.parent / "uploads"
+    uploads_dir.mkdir(exist_ok=True)
+    filepath = uploads_dir / filename
+
+    content = await file.read()
+    filepath.write_bytes(content)
+
+    return {"receipt_url": f"/uploads/{filename}"}
+
+
 @router.post("/scan-receipt")
 async def scan_receipt(
     file: UploadFile = File(...),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("EMPLOYEE")),
 ):
     """Upload a receipt image and get OCR-parsed fields."""
     if not file.content_type or not (

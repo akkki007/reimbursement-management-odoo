@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
@@ -41,6 +42,22 @@ def create_refresh_token(user_id: str) -> str:
         "type": "refresh",
     }
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def create_password_reset_token(user_id: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.password_reset_expire_minutes
+    )
+    payload = {
+        "sub": user_id,
+        "exp": expire,
+        "type": "password_reset",
+    }
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def generate_random_password(length: int = 12) -> str:
+    return secrets.token_urlsafe(length)
 
 
 def decode_token(token: str) -> dict | None:

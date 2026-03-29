@@ -6,7 +6,8 @@ from app.schemas.user import (
     UpdateRoleRequest,
     AssignManagerRequest,
 )
-from app.services.auth_service import hash_password
+from app.services.auth_service import hash_password, generate_random_password
+from app.services.email_service import send_generated_password_email
 from app.middleware.role_middleware import require_role
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
@@ -50,10 +51,12 @@ async def create_user(
         if not manager or manager.companyId != current_user.companyId:
             raise HTTPException(status_code=400, detail="Invalid manager")
 
+    password = req.password or generate_random_password()
+
     user = await db.user.create(
         data={
             "email": req.email,
-            "passwordHash": hash_password(req.password),
+            "passwordHash": hash_password(password),
             "firstName": req.first_name,
             "lastName": req.last_name,
             "role": req.role,
@@ -149,3 +152,35 @@ async def deactivate_user(
 
     await db.user.update(where={"id": user_id}, data={"isActive": False})
     return {"detail": "User deactivated"}
+
+
+@router.post("/{user_id}/send-password")
+async def send_password(
+    user_id: str,
+    current_user=Depends(require_role("ADMIN")),
+):
+    user = await db.user.find_unique(where={"id": user_id})
+    if not user or user.companyId != current_user.companyId:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not user.isActive:
+        raise HTTPException(status_code=400, detail="Cannot send password to inactive user")
+
+    password = generate_random_password()
+    await db.user.update(
+        where={"id": user_id},
+        data={
+            "passwordHash": hash_password(password),
+            "mustChangePassword": True,
+        },
+    )
+
+    try:
+        await send_generated_password_email(user.email, password)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Password updated but failed to send email: {str(e)}",
+        )
+
+    return {"detail": "Password sent to user's email."}

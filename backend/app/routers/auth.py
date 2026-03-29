@@ -6,6 +6,8 @@ from app.schemas.auth import (
     LoginRequest,
     TokenResponse,
     RefreshRequest,
+    ForgotPasswordRequest,
+    SetPasswordRequest,
     MeResponse,
     UserResponse,
 )
@@ -98,6 +100,28 @@ async def refresh_token(req: RefreshRequest):
     )
 
 
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest):
+    """Reset password directly with email and new password."""
+    if len(req.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    user = await db.user.find_unique(where={"email": req.email})
+    if not user:
+        raise HTTPException(status_code=404, detail="No account found with that email")
+    if not user.isActive:
+        raise HTTPException(status_code=403, detail="Account is deactivated")
+
+    await db.user.update(
+        where={"id": user.id},
+        data={
+            "passwordHash": hash_password(req.new_password),
+            "mustChangePassword": False,
+        },
+    )
+    return {"detail": "Password has been reset successfully."}
+
+
 @router.get("/me", response_model=MeResponse)
 async def get_me(current_user=Depends(get_current_user)):
     company = await db.company.find_unique(where={"id": current_user.companyId})
@@ -110,6 +134,7 @@ async def get_me(current_user=Depends(get_current_user)):
             last_name=current_user.lastName,
             role=current_user.role,
             is_active=current_user.isActive,
+            must_change_password=current_user.mustChangePassword,
             company_id=current_user.companyId,
             manager_id=current_user.managerId,
         ),
@@ -120,3 +145,19 @@ async def get_me(current_user=Depends(get_current_user)):
             "default_currency": company.defaultCurrency,
         },
     )
+
+
+@router.post("/set-password")
+async def set_password(req: SetPasswordRequest, current_user=Depends(get_current_user)):
+    """Set a new password for a user who must change their temporary password."""
+    if len(req.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    await db.user.update(
+        where={"id": current_user.id},
+        data={
+            "passwordHash": hash_password(req.new_password),
+            "mustChangePassword": False,
+        },
+    )
+    return {"detail": "Password set successfully."}

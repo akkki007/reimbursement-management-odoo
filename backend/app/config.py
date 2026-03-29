@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     ollama_url: str = "http://localhost:11434"
     ocr_model: str = "glm-ocr:latest"
     frontend_url: str = "http://localhost:5173"
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    password_reset_expire_minutes: int = 30
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 

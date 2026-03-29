@@ -12,7 +12,7 @@ const COMMON_CURRENCIES = [
 ];
 
 export default function SubmitExpense() {
-  const { user, company } = useAuth();
+  const { company } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -23,7 +23,6 @@ export default function SubmitExpense() {
     amount: '',
     currency: company?.default_currency || 'USD',
     remarks: '',
-    is_manager_approver: false,
   });
   const [receiptFile, setReceiptFile] = useState(null);
   const [error, setError] = useState('');
@@ -34,7 +33,17 @@ export default function SubmitExpense() {
     setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const buildPayload = () => ({
+  const uploadReceipt = async () => {
+    if (!receiptFile) return null;
+    const formData = new FormData();
+    formData.append('file', receiptFile);
+    const { data } = await client.post('/expenses/upload-receipt', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data.receipt_url;
+  };
+
+  const buildPayload = (receiptUrl) => ({
     amount: parseFloat(form.amount),
     currency: form.currency,
     category: form.category,
@@ -42,7 +51,8 @@ export default function SubmitExpense() {
     remarks: form.remarks || null,
     paid_by: form.paid_by,
     expense_date: new Date(form.expense_date).toISOString(),
-    is_manager_approver: form.is_manager_approver,
+    is_manager_approver: false,
+    receipt_url: receiptUrl || null,
   });
 
   const handleSubmit = async (e) => {
@@ -53,7 +63,8 @@ export default function SubmitExpense() {
 
     setLoading(true);
     try {
-      await client.post('/expenses', buildPayload());
+      const receiptUrl = await uploadReceipt();
+      await client.post('/expenses', buildPayload(receiptUrl));
       navigate('/expenses');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to submit expense');
@@ -70,7 +81,8 @@ export default function SubmitExpense() {
 
     setSavingDraft(true);
     try {
-      await client.post('/expenses/draft', buildPayload());
+      const receiptUrl = await uploadReceipt();
+      await client.post('/expenses/draft', buildPayload(receiptUrl));
       navigate('/expenses');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to save draft');
@@ -78,8 +90,6 @@ export default function SubmitExpense() {
       setSavingDraft(false);
     }
   };
-
-  const hasManager = !!user?.manager_id;
 
   return (
     <Layout>
@@ -185,18 +195,6 @@ export default function SubmitExpense() {
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-400 text-sm resize-none"
                   placeholder="Additional notes or context (optional)" />
               </div>
-
-              {/* Manager toggle */}
-              {hasManager && (
-                <label className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 cursor-pointer hover:bg-gray-50">
-                  <input type="checkbox" name="is_manager_approver" checked={form.is_manager_approver} onChange={handleChange}
-                    className="h-4 w-4 rounded border-gray-300 text-primary-500 focus:ring-primary-400" />
-                  <div>
-                    <p className="text-sm font-medium text-navy">Require manager approval first</p>
-                    <p className="text-[11px] text-gray-500">Request goes to your manager before other approvers</p>
-                  </div>
-                </label>
-              )}
 
               {/* Buttons */}
               <div className="flex gap-3">

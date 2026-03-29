@@ -3,6 +3,8 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import ForgotPassword from './pages/ForgotPassword';
+import SetPassword from './pages/SetPassword';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import SubmitExpense from './pages/expenses/SubmitExpense';
@@ -23,6 +25,17 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+
+          {/* Set password (must change) */}
+          <Route
+            path="/set-password"
+            element={
+              <ProtectedRoute allowSetPassword>
+                <SetPassword />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Protected routes */}
           <Route
@@ -34,11 +47,11 @@ export default function App() {
             }
           />
 
-          {/* Expense routes */}
+          {/* Expense routes (Employee only) */}
           <Route
             path="/expenses/submit"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute roles={['EMPLOYEE']}>
                 <SubmitExpense />
               </ProtectedRoute>
             }
@@ -46,7 +59,7 @@ export default function App() {
           <Route
             path="/expenses/scan"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute roles={['EMPLOYEE']}>
                 <ScanReceipt />
               </ProtectedRoute>
             }

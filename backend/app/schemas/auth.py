@@ -32,10 +32,20 @@ class UserResponse(BaseModel):
     last_name: str
     role: str
     is_active: bool
+    must_change_password: bool = False
     company_id: str
     manager_id: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+    new_password: str
+
+
+class SetPasswordRequest(BaseModel):
+    new_password: str
 
 
 class MeResponse(BaseModel):

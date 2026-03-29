@@ -1,8 +1,11 @@
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.dependencies import connect_db, disconnect_db
@@ -63,6 +66,12 @@ app.include_router(expenses.router)
 app.include_router(approvals.router)
 app.include_router(approval_rules.router)
 app.include_router(company.router)
+
+
+# Serve uploaded receipts
+uploads_dir = Path(__file__).resolve().parent.parent / "uploads"
+uploads_dir.mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 
 # Health check
