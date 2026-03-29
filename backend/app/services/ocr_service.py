@@ -7,6 +7,54 @@ from fastapi import UploadFile
 
 from app.config import get_settings
 
+CURRENCY_SYMBOL_MAP = {
+    "$": "USD",
+    "€": "EUR",
+    "£": "GBP",
+    "¥": "JPY",
+    "₹": "INR",
+    "₩": "KRW",
+    "₽": "RUB",
+    "₺": "TRY",
+    "₴": "UAH",
+    "₿": "BTC",
+    "R$": "BRL",
+    "C$": "CAD",
+    "A$": "AUD",
+    "NZ$": "NZD",
+    "HK$": "HKD",
+    "S$": "SGD",
+    "₱": "PHP",
+    "₫": "VND",
+    "฿": "THB",
+    "RM": "MYR",
+    "kr": "SEK",
+    "zł": "PLN",
+    "Kč": "CZK",
+    "CHF": "CHF",
+    "AED": "AED",
+    "SAR": "SAR",
+    "ZAR": "ZAR",
+}
+
+
+def _normalize_currency(raw_currency: str | None) -> str | None:
+    """Convert currency symbols or common shorthand to 3-letter ISO codes."""
+    if not raw_currency:
+        return None
+    stripped = raw_currency.strip()
+    # Already a valid 3-letter code
+    if len(stripped) == 3 and stripped.isalpha():
+        return stripped.upper()
+    # Check symbol map
+    if stripped in CURRENCY_SYMBOL_MAP:
+        return CURRENCY_SYMBOL_MAP[stripped]
+    # Try uppercase match (e.g. "usd" -> "USD")
+    if len(stripped) == 3 and stripped.upper().isalpha():
+        return stripped.upper()
+    return None
+
+
 CATEGORY_MAP = {
     "food": "MEALS",
     "meal": "MEALS",
@@ -147,7 +195,7 @@ If you cannot determine a field, use null for that value."""
 
         return {
             "amount": parsed.get("amount"),
-            "currency": parsed.get("currency"),
+            "currency": _normalize_currency(parsed.get("currency")),
             "date": parsed.get("date"),
             "vendor_name": parsed.get("vendor_name"),
             "category": _map_category(parsed.get("category")),

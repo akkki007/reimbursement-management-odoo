@@ -44,15 +44,24 @@ async def get_exchange_rate(from_currency: str, to_currency: str) -> float:
     if from_currency == to_currency:
         return 1.0
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(
-            f"https://api.exchangerate-api.com/v4/latest/{from_currency}"
-        )
-        resp.raise_for_status()
-        data = resp.json()
+    # Validate currency codes are 3-letter alphabetic
+    if not from_currency or not from_currency.isalpha() or len(from_currency) != 3:
+        raise ValueError(f"Invalid currency code: {from_currency}")
+    if not to_currency or not to_currency.isalpha() or len(to_currency) != 3:
+        raise ValueError(f"Invalid currency code: {to_currency}")
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"https://api.exchangerate-api.com/v4/latest/{from_currency.upper()}"
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPStatusError:
+        raise ValueError(f"Could not fetch exchange rate for {from_currency}")
 
     rates = data.get("rates", {})
-    rate = rates.get(to_currency)
+    rate = rates.get(to_currency.upper())
     if rate is None:
         raise ValueError(f"Exchange rate not found for {from_currency} -> {to_currency}")
     return float(rate)

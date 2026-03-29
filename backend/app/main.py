@@ -48,6 +48,8 @@ async def permission_error_handler(request: Request, exc: PermissionError):
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
+    import traceback
+    traceback.print_exc()
     return JSONResponse(
         status_code=500,
         content={"detail": "An internal error occurred"},
