@@ -39,26 +39,33 @@ async def create_expense(
         if not user or not user.managerId:
             is_manager_approver = False
 
-    expense = await db.expense.create(
-        data={
-            "companyId": company_id,
-            "submittedById": user_id,
-            "amount": float(amount),
-            "currency": currency,
-            "convertedAmount": float(converted_amount) if converted_amount else None,
-            "exchangeRate": float(exchange_rate) if exchange_rate else None,
-            "category": category,
-            "description": description,
-            "expenseDate": expense_date,
-            "status": "DRAFT",
-            "remarks": remarks,
-            "paidBy": paid_by,
-            "isManagerApprover": is_manager_approver,
-            "receiptUrl": receipt_url,
-            "ocrVendorName": ocr_vendor_name,
-            "ocrRawData": ocr_raw_data,
-        }
-    )
+    data = {
+        "company": {"connect": {"id": company_id}},
+        "submittedBy": {"connect": {"id": user_id}},
+        "amount": float(amount),
+        "currency": currency,
+        "category": category,
+        "description": description,
+        "expenseDate": expense_date,
+        "status": "DRAFT",
+        "paidBy": paid_by,
+        "isManagerApprover": is_manager_approver,
+    }
+
+    if converted_amount is not None:
+        data["convertedAmount"] = float(converted_amount)
+    if exchange_rate is not None:
+        data["exchangeRate"] = float(exchange_rate)
+    if remarks is not None:
+        data["remarks"] = remarks
+    if receipt_url is not None:
+        data["receiptUrl"] = receipt_url
+    if ocr_vendor_name is not None:
+        data["ocrVendorName"] = ocr_vendor_name
+    if ocr_raw_data is not None:
+        data["ocrRawData"] = ocr_raw_data
+
+    expense = await db.expense.create(data=data)
 
     return expense
 
