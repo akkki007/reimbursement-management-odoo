@@ -114,15 +114,18 @@ enum ApprovalRuleType {
 }
 
 model ApprovalRule {
-  id              String           @id @default(uuid())
-  companyId       String
-  name            String
-  ruleType        ApprovalRuleType @default(PERCENTAGE)
-  percentRequired Float?
-  specificUserId  String?
-  isDefault       Boolean          @default(false)
-  isActive        Boolean          @default(true)
-  createdAt       DateTime         @default(now())
+  id                String           @id @default(uuid())
+  companyId         String
+  name              String
+  description       String?
+  ruleType          ApprovalRuleType @default(PERCENTAGE)
+  percentRequired   Float?
+  specificUserId    String?
+  isSequential      Boolean          @default(true)  // true = 1→2→3, false = all at once
+  isManagerApprover Boolean          @default(false) // if true, manager approves first
+  isDefault         Boolean          @default(false)
+  isActive          Boolean          @default(true)
+  createdAt         DateTime         @default(now())
 
   company Company            @relation(fields: [companyId], references: [id])
   steps   ApprovalRuleStep[]
@@ -131,11 +134,12 @@ model ApprovalRule {
 }
 
 model ApprovalRuleStep {
-  id             String @id @default(uuid())
+  id             String  @id @default(uuid())
   approvalRuleId String
   stepOrder      Int
   approverId     String
   stepLabel      String?
+  isRequired     Boolean @default(false) // if true, this approver MUST approve
 
   approvalRule ApprovalRule @relation(fields: [approvalRuleId], references: [id], onDelete: Cascade)
 
@@ -157,6 +161,7 @@ model ApprovalStep {
   approverId String
   stepOrder  Int
   stepLabel  String?
+  isRequired Boolean            @default(false)
   status     ApprovalStepStatus @default(PENDING)
   createdAt  DateTime           @default(now())
 

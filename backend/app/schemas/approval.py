@@ -16,18 +16,24 @@ class OverrideRequest(BaseModel):
 
 class CreateApprovalRuleRequest(BaseModel):
     name: str
+    description: str | None = None
     rule_type: str = "PERCENTAGE"
     percent_required: float | None = None
     specific_user_id: str | None = None
+    is_sequential: bool = True
+    is_manager_approver: bool = False
     is_default: bool = False
-    steps: list[dict]  # [{"approver_id": "...", "step_label": "..."}]
+    steps: list[dict]  # [{"approver_id": "...", "step_label": "...", "is_required": false}]
 
 
 class UpdateApprovalRuleRequest(BaseModel):
     name: str | None = None
+    description: str | None = None
     rule_type: str | None = None
     percent_required: float | None = None
     specific_user_id: str | None = None
+    is_sequential: bool | None = None
+    is_manager_approver: bool | None = None
     steps: list[dict] | None = None
 
 

@@ -60,7 +60,13 @@ async def create_expense(
 
 
 async def submit_expense(expense_id: str, user_id: str):
-    """Submit a draft expense — triggers approval workflow generation."""
+    """Submit a draft expense — triggers approval workflow generation.
+
+    Handles two modes from the rule:
+    - Sequential (isSequential=True): steps go 1→2→3, only current step is AWAITING
+    - Parallel (isSequential=False): ALL approvers get AWAITING at once
+    Also handles isManagerApprover on the rule (manager goes first regardless).
+    """
 
     expense = await db.expense.find_unique(where={"id": expense_id})
     if not expense:
@@ -80,11 +86,13 @@ async def submit_expense(expense_id: str, user_id: str):
         include={"steps": True},
     )
 
+    is_sequential = rule.isSequential if rule else True
     steps_to_create = []
     step_order = 0
 
-    # If manager approval requested and user has a manager, add as step 0
-    if expense.isManagerApprover:
+    # Manager-first: from expense toggle OR from rule's isManagerApprover
+    needs_manager = expense.isManagerApprover or (rule and rule.isManagerApprover)
+    if needs_manager:
         user = await db.user.find_unique(where={"id": user_id})
         if user and user.managerId:
             steps_to_create.append({
@@ -92,6 +100,7 @@ async def submit_expense(expense_id: str, user_id: str):
                 "approverId": user.managerId,
                 "stepOrder": step_order,
                 "stepLabel": "Manager",
+                "isRequired": True,
                 "status": "AWAITING",
             })
             step_order += 1
@@ -105,7 +114,8 @@ async def submit_expense(expense_id: str, user_id: str):
                 "approverId": rule_step.approverId,
                 "stepOrder": step_order + i,
                 "stepLabel": rule_step.stepLabel,
-                "status": "AWAITING" if (step_order + i == 0 or (step_order == 0 and i == 0)) else "PENDING",
+                "isRequired": rule_step.isRequired,
+                "status": "PENDING",
             })
 
     # If no steps at all, auto-approve
@@ -116,9 +126,22 @@ async def submit_expense(expense_id: str, user_id: str):
         )
         return await db.expense.find_unique(where={"id": expense_id})
 
-    # Ensure only the first step is AWAITING
-    for i, step in enumerate(steps_to_create):
-        step["status"] = "AWAITING" if i == 0 else "PENDING"
+    # Set initial statuses based on mode
+    if is_sequential:
+        # Only the first step is AWAITING
+        for i, step in enumerate(steps_to_create):
+            step["status"] = "AWAITING" if i == 0 else "PENDING"
+    else:
+        # Parallel: manager step (if any) is AWAITING first, then all others
+        # If manager step exists, only it is AWAITING first (manager always goes first)
+        has_manager_step = any(s["stepLabel"] == "Manager" for s in steps_to_create)
+        if has_manager_step:
+            for step in steps_to_create:
+                step["status"] = "AWAITING" if step["stepLabel"] == "Manager" else "PENDING"
+        else:
+            # No manager step, all AWAITING at once
+            for step in steps_to_create:
+                step["status"] = "AWAITING"
 
     # Create all approval steps
     for step_data in steps_to_create:

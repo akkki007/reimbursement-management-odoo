@@ -51,9 +51,12 @@ async def create_rule(
         data={
             "companyId": current_user.companyId,
             "name": req.name,
+            "description": req.description,
             "ruleType": req.rule_type,
             "percentRequired": req.percent_required,
             "specificUserId": req.specific_user_id,
+            "isSequential": req.is_sequential,
+            "isManagerApprover": req.is_manager_approver,
             "isDefault": req.is_default,
         }
     )
@@ -66,6 +69,7 @@ async def create_rule(
                 "stepOrder": i + 1,
                 "approverId": step["approver_id"],
                 "stepLabel": step.get("step_label"),
+                "isRequired": step.get("is_required", False),
             }
         )
 
@@ -90,12 +94,18 @@ async def update_rule(
     update_data = {}
     if req.name is not None:
         update_data["name"] = req.name
+    if req.description is not None:
+        update_data["description"] = req.description
     if req.rule_type is not None:
         update_data["ruleType"] = req.rule_type
     if req.percent_required is not None:
         update_data["percentRequired"] = req.percent_required
     if req.specific_user_id is not None:
         update_data["specificUserId"] = req.specific_user_id
+    if req.is_sequential is not None:
+        update_data["isSequential"] = req.is_sequential
+    if req.is_manager_approver is not None:
+        update_data["isManagerApprover"] = req.is_manager_approver
 
     if update_data:
         await db.approvalrule.update(where={"id": rule_id}, data=update_data)
@@ -116,6 +126,7 @@ async def update_rule(
                     "stepOrder": i + 1,
                     "approverId": step["approver_id"],
                     "stepLabel": step.get("step_label"),
+                    "isRequired": step.get("is_required", False),
                 }
             )
 
@@ -162,9 +173,12 @@ def _serialize_rule(rule) -> dict:
     return {
         "id": rule.id,
         "name": rule.name,
+        "description": rule.description,
         "rule_type": rule.ruleType,
         "percent_required": rule.percentRequired,
         "specific_user_id": rule.specificUserId,
+        "is_sequential": rule.isSequential,
+        "is_manager_approver": rule.isManagerApprover,
         "is_default": rule.isDefault,
         "is_active": rule.isActive,
         "created_at": rule.createdAt.isoformat(),
@@ -174,6 +188,7 @@ def _serialize_rule(rule) -> dict:
                 "step_order": s.stepOrder,
                 "approver_id": s.approverId,
                 "step_label": s.stepLabel,
+                "is_required": s.isRequired,
             }
             for s in (rule.steps or [])
         ],
