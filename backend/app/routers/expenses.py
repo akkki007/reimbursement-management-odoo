@@ -272,6 +272,9 @@ async def update_expense(
     return serialize_expense(updated)
 
 
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
 @router.post("/upload-receipt")
 async def upload_receipt(
     file: UploadFile = File(...),
@@ -283,13 +286,20 @@ async def upload_receipt(
     ):
         raise HTTPException(status_code=400, detail="Only images and PDFs are accepted")
 
-    ext = Path(file.filename).suffix if file.filename else ".bin"
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 10MB.")
+
+    # Sanitize extension: only allow safe extensions
+    ext = Path(file.filename).suffix.lower() if file.filename else ".bin"
+    allowed_ext = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".bmp", ".tiff"}
+    if ext not in allowed_ext:
+        ext = ".bin"
     filename = f"{uuid.uuid4().hex}{ext}"
     uploads_dir = Path(__file__).resolve().parent.parent.parent / "uploads"
     uploads_dir.mkdir(exist_ok=True)
     filepath = uploads_dir / filename
 
-    content = await file.read()
     filepath.write_bytes(content)
 
     return {"receipt_url": f"/uploads/{filename}"}
@@ -305,6 +315,13 @@ async def scan_receipt(
         file.content_type.startswith("image/") or file.content_type == "application/pdf"
     ):
         raise HTTPException(status_code=400, detail="Only images and PDFs are accepted")
+
+    # Check file size before processing
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 10MB.")
+    # Reset file position for OCR service
+    await file.seek(0)
 
     result = await parse_receipt(file)
     return result

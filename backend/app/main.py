@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.dependencies import connect_db, disconnect_db
+from app.middleware.rate_limit import RateLimitMiddleware
 from app.routers import auth, users, expenses, approvals, approval_rules, company
 
 settings = get_settings()
@@ -28,13 +29,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Rate limiting (must be added before CORS)
+app.add_middleware(RateLimitMiddleware)
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_url],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 

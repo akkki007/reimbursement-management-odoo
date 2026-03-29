@@ -102,15 +102,14 @@ async def refresh_token(req: RefreshRequest):
 
 @router.post("/forgot-password")
 async def forgot_password(req: ForgotPasswordRequest):
-    """Reset password directly with email and new password."""
-    if len(req.new_password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-
+    """Reset password with email, current password, and new password."""
     user = await db.user.find_unique(where={"email": req.email})
     if not user:
         raise HTTPException(status_code=404, detail="No account found with that email")
     if not user.isActive:
         raise HTTPException(status_code=403, detail="Account is deactivated")
+    if not verify_password(req.current_password, user.passwordHash):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
 
     await db.user.update(
         where={"id": user.id},

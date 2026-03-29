@@ -1,0 +1,87 @@
+services:
+  # ── PostgreSQL ────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-reimburse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reimburse_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-reimburse_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-reimburse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI Backend ───────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-reimburse}:${POSTGRES_PASSWORD:-reimburse_secret}@db:5432/${POSTGRES_DB:-reimburse_db}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      MINDEE_API_KEY: ${MINDEE_API_KEY:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OCR_MODEL: ${OCR_MODEL:-glm-ocr:latest}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      PASSWORD_RESET_EXPIRE_MINUTES: ${PASSWORD_RESET_EXPIRE_MINUTES:-30}
+    volumes:
+      - uploads:/app/uploads
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  # ── React Frontend (nginx) ───────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+
+  # ── DB Migration + Seed (run once) ───────────────
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-reimburse}:${POSTGRES_PASSWORD:-reimburse_secret}@db:5432/${POSTGRES_DB:-reimburse_db}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-placeholder}
+      JWT_ALGORITHM: HS256
+    command: >
+      sh -c "prisma db push --schema=prisma/schema.prisma && python seed.py"
+    profiles:
+      - setup
+
+volumes:
+  pgdata:
+  uploads:

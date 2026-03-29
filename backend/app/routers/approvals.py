@@ -66,16 +66,16 @@ async def get_approval_history(
     expense_id: str,
     current_user=Depends(require_role("MANAGER", "ADMIN")),
 ):
+    # Always verify the expense belongs to the user's company
+    expense = await db.expense.find_unique(where={"id": expense_id})
+    if not expense or expense.companyId != current_user.companyId:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
     actions = await db.approvalaction.find_many(
         where={"expenseId": expense_id},
         include={"actor": True},
         order={"createdAt": "asc"},
     )
-
-    if not actions:
-        expense = await db.expense.find_unique(where={"id": expense_id})
-        if not expense or expense.companyId != current_user.companyId:
-            raise HTTPException(status_code=404, detail="Expense not found")
 
     return [
         {
