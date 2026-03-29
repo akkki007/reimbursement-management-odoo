@@ -1,0 +1,182 @@
+generator client {
+  provider                    = "prisma-client-py"
+  interface                   = "asyncio"
+  recursive_type_depth        = 5
+  enable_experimental_decimal = true
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── COMPANY ───────────────────────────────────────
+model Company {
+  id              String   @id @default(uuid())
+  name            String
+  country         String
+  defaultCurrency String   @default("USD")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users         User[]
+  approvalRules ApprovalRule[]
+  expenses      Expense[]
+}
+
+// ─── USER ──────────────────────────────────────────
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         Role     @default(EMPLOYEE)
+  isActive     Boolean  @default(true)
+  companyId    String
+  managerId    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company      Company @relation(fields: [companyId], references: [id])
+  manager      User?   @relation("ManagerEmployee", fields: [managerId], references: [id])
+  subordinates User[]  @relation("ManagerEmployee")
+
+  expensesSubmitted Expense[]        @relation("SubmittedBy")
+  approvalActions   ApprovalAction[]
+  approverSteps     ApprovalStep[]   @relation("StepApprover")
+
+  @@index([companyId])
+  @@index([managerId])
+}
+
+// ─── EXPENSE ───────────────────────────────────────
+enum ExpenseStatus {
+  DRAFT
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+}
+
+enum ExpenseCategory {
+  TRAVEL
+  MEALS
+  ACCOMMODATION
+  OFFICE_SUPPLIES
+  TRANSPORT
+  ENTERTAINMENT
+  SOFTWARE
+  OTHER
+}
+
+model Expense {
+  id                String          @id @default(uuid())
+  companyId         String
+  submittedById     String
+  amount            Decimal         @db.Decimal(12, 2)
+  currency          String
+  convertedAmount   Decimal?        @db.Decimal(12, 2)
+  exchangeRate      Decimal?        @db.Decimal(12, 6)
+  category          ExpenseCategory
+  description       String
+  receiptUrl        String?
+  expenseDate       DateTime
+  status            ExpenseStatus   @default(DRAFT)
+  isManagerApprover Boolean         @default(false)
+  currentStepOrder  Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  ocrVendorName String?
+  ocrRawData    Json?
+
+  company         Company          @relation(fields: [companyId], references: [id])
+  submittedBy     User             @relation("SubmittedBy", fields: [submittedById], references: [id])
+  approvalSteps   ApprovalStep[]
+  approvalActions ApprovalAction[]
+
+  @@index([companyId, status])
+  @@index([submittedById])
+}
+
+// ─── APPROVAL WORKFLOW ─────────────────────────────
+enum ApprovalRuleType {
+  PERCENTAGE
+  SPECIFIC_USER
+  HYBRID
+}
+
+model ApprovalRule {
+  id              String           @id @default(uuid())
+  companyId       String
+  name            String
+  ruleType        ApprovalRuleType @default(PERCENTAGE)
+  percentRequired Float?
+  specificUserId  String?
+  isDefault       Boolean          @default(false)
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+
+  company Company            @relation(fields: [companyId], references: [id])
+  steps   ApprovalRuleStep[]
+
+  @@index([companyId])
+}
+
+model ApprovalRuleStep {
+  id             String @id @default(uuid())
+  approvalRuleId String
+  stepOrder      Int
+  approverId     String
+  stepLabel      String?
+
+  approvalRule ApprovalRule @relation(fields: [approvalRuleId], references: [id], onDelete: Cascade)
+
+  @@unique([approvalRuleId, stepOrder])
+}
+
+// ─── PER-EXPENSE APPROVAL TRACKING ────────────────
+enum ApprovalStepStatus {
+  PENDING
+  AWAITING
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+model ApprovalStep {
+  id         String             @id @default(uuid())
+  expenseId  String
+  approverId String
+  stepOrder  Int
+  stepLabel  String?
+  status     ApprovalStepStatus @default(PENDING)
+  createdAt  DateTime           @default(now())
+
+  expense  Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  approver User    @relation("StepApprover", fields: [approverId], references: [id])
+
+  @@unique([expenseId, stepOrder])
+  @@index([approverId, status])
+}
+
+model ApprovalAction {
+  id        String   @id @default(uuid())
+  expenseId String
+  actorId   String
+  action    String
+  comment   String?
+  createdAt DateTime @default(now())
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  actor   User    @relation(fields: [actorId], references: [id])
+
+  @@index([expenseId])
+}
