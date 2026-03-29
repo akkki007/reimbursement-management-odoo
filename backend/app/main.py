@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.dependencies import connect_db, disconnect_db
-from app.routers import auth, users, expenses
+from app.routers import auth, users, expenses, approvals, approval_rules, company
 
 settings = get_settings()
 
@@ -58,6 +58,9 @@ async def general_exception_handler(request: Request, exc: Exception):
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(expenses.router)
+app.include_router(approvals.router)
+app.include_router(approval_rules.router)
+app.include_router(company.router)
 
 
 # Health check
