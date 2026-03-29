@@ -8,7 +8,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
-    mindee_api_key: str = ""
+    ollama_url: str = "http://localhost:11434"
+    ocr_model: str = "glm-ocr:latest"
     frontend_url: str = "http://localhost:5173"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
