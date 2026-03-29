@@ -30,12 +30,14 @@ export default function ManageUsers() {
     <Layout>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Manage Users</h1>
-          <p className="text-gray-500 mt-1">{users.length} users in your company</p>
+          <h1 className="font-display text-3xl font-bold uppercase tracking-tight text-navy">
+            Manage users
+          </h1>
+          <p className="text-sm text-gray-600 mt-1">{users.length} users in your company</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-primary-400 hover:bg-primary-500 text-gray-900 font-semibold rounded-xl transition-colors"
+          className="flex items-center gap-2 px-4 py-2.5 bg-primary-400 hover:bg-primary-500 text-navy font-semibold rounded-lg transition-colors text-sm"
         >
           <Plus size={18} />
           Add User
@@ -59,7 +61,7 @@ export default function ManageUsers() {
       )}
 
       {/* Users table */}
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-400">Loading...</div>
         ) : (
@@ -263,9 +265,9 @@ function CreateUserModal({ managers, onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 m-4">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-xl w-full max-w-md p-6 m-4">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-gray-900">Add New User</h2>
+          <h2 className="font-display text-lg font-bold uppercase text-navy">Add user</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={20} />
           </button>
@@ -361,7 +363,7 @@ function CreateUserModal({ managers, onClose, onCreated }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 bg-primary-400 hover:bg-primary-500 text-gray-900 font-semibold rounded-xl transition-colors disabled:opacity-50"
+            className="w-full py-2.5 bg-primary-400 hover:bg-primary-500 text-navy font-semibold rounded-lg transition-colors disabled:opacity-50 text-sm"
           >
             {loading ? 'Creating...' : 'Create User'}
           </button>

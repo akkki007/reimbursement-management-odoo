@@ -1,0 +1,182 @@
+from datetime import datetime
+
+from fastapi import APIRouter, HTTPException, Depends, Query
+
+from app.dependencies import db
+from app.middleware.auth_middleware import get_current_user
+from app.schemas.expense import CreateExpenseRequest, UpdateExpenseRequest
+from app.services.expense_service import (
+    create_expense,
+    submit_expense,
+    serialize_expense,
+)
+
+router = APIRouter(prefix="/api/expenses", tags=["Expenses"])
+
+
+@router.post("/")
+async def create_and_submit_expense(
+    req: CreateExpenseRequest,
+    current_user=Depends(get_current_user),
+):
+    """Create an expense and immediately submit it for approval."""
+    expense = await create_expense(
+        user_id=current_user.id,
+        company_id=current_user.companyId,
+        amount=req.amount,
+        currency=req.currency,
+        category=req.category,
+        description=req.description,
+        expense_date=req.expense_date,
+        is_manager_approver=req.is_manager_approver,
+        receipt_url=req.receipt_url,
+        ocr_vendor_name=req.ocr_vendor_name,
+        ocr_raw_data=req.ocr_raw_data,
+    )
+
+    # Immediately submit (triggers workflow)
+    submitted = await submit_expense(expense.id, current_user.id)
+    return serialize_expense(submitted)
+
+
+@router.get("/")
+async def list_expenses(
+    current_user=Depends(get_current_user),
+    status: str | None = Query(None),
+    category: str | None = Query(None),
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+):
+    """List expenses for the current user. Admins see all company expenses."""
+    where = {"companyId": current_user.companyId}
+
+    if current_user.role == "EMPLOYEE":
+        where["submittedById"] = current_user.id
+    elif current_user.role == "MANAGER":
+        # Managers see their own + their subordinates' expenses
+        subordinates = await db.user.find_many(
+            where={"managerId": current_user.id}
+        )
+        sub_ids = [s.id for s in subordinates]
+        sub_ids.append(current_user.id)
+        where["submittedById"] = {"in": sub_ids}
+    # ADMIN sees all company expenses (no extra filter)
+
+    if status:
+        where["status"] = status
+    if category:
+        where["category"] = category
+    if date_from:
+        where["expenseDate"] = {**(where.get("expenseDate") or {}), "gte": date_from}
+    if date_to:
+        where["expenseDate"] = {**(where.get("expenseDate") or {}), "lte": date_to}
+
+    expenses = await db.expense.find_many(
+        where=where,
+        order={"createdAt": "desc"},
+        include={"submittedBy": True},
+    )
+
+    result = []
+    for e in expenses:
+        data = serialize_expense(e)
+        data["submitted_by_name"] = f"{e.submittedBy.firstName} {e.submittedBy.lastName}"
+        result.append(data)
+
+    return result
+
+
+@router.get("/{expense_id}")
+async def get_expense(expense_id: str, current_user=Depends(get_current_user)):
+    """Get expense detail with approval steps."""
+    expense = await db.expense.find_unique(
+        where={"id": expense_id},
+        include={
+            "submittedBy": True,
+            "approvalSteps": {
+                "include": {"approver": True},
+                "order_by": {"stepOrder": "asc"},
+            },
+            "approvalActions": {
+                "include": {"actor": True},
+                "order_by": {"createdAt": "asc"},
+            },
+        },
+    )
+
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    if expense.companyId != current_user.companyId:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Employees can only see their own
+    if current_user.role == "EMPLOYEE" and expense.submittedById != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    data = serialize_expense(expense)
+    data["submitted_by_name"] = f"{expense.submittedBy.firstName} {expense.submittedBy.lastName}"
+    data["submitted_by_email"] = expense.submittedBy.email
+
+    data["approval_steps"] = [
+        {
+            "id": s.id,
+            "step_order": s.stepOrder,
+            "step_label": s.stepLabel,
+            "status": s.status,
+            "approver_id": s.approverId,
+            "approver_name": f"{s.approver.firstName} {s.approver.lastName}",
+        }
+        for s in expense.approvalSteps
+    ]
+
+    data["approval_actions"] = [
+        {
+            "id": a.id,
+            "action": a.action,
+            "comment": a.comment,
+            "actor_id": a.actorId,
+            "actor_name": f"{a.actor.firstName} {a.actor.lastName}",
+            "created_at": a.createdAt.isoformat(),
+        }
+        for a in expense.approvalActions
+    ]
+
+    return data
+
+
+@router.patch("/{expense_id}")
+async def update_expense(
+    expense_id: str,
+    req: UpdateExpenseRequest,
+    current_user=Depends(get_current_user),
+):
+    """Edit a draft expense."""
+    expense = await db.expense.find_unique(where={"id": expense_id})
+
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    if expense.submittedById != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your expense")
+    if expense.status != "DRAFT":
+        raise HTTPException(status_code=400, detail="Can only edit draft expenses")
+
+    update_data = {}
+    if req.amount is not None:
+        update_data["amount"] = float(req.amount)
+    if req.currency is not None:
+        update_data["currency"] = req.currency
+    if req.category is not None:
+        update_data["category"] = req.category
+    if req.description is not None:
+        update_data["description"] = req.description
+    if req.expense_date is not None:
+        update_data["expenseDate"] = req.expense_date
+    if req.is_manager_approver is not None:
+        update_data["isManagerApprover"] = req.is_manager_approver
+
+    updated = await db.expense.update(
+        where={"id": expense_id},
+        data=update_data,
+    )
+    return serialize_expense(updated)
