@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
@@ -41,11 +41,30 @@ async def get_expense_stats(current_user=Depends(get_current_user)):
         )
         pending_approvals = len(steps)
 
+    # Monthly breakdown for chart (last 6 months)
+    monthly = {}
+    for e in all_expenses:
+        if e.status == "DRAFT":
+            continue
+        key = e.expenseDate.strftime("%Y-%m")
+        amt = float(e.convertedAmount or e.amount)
+        monthly[key] = monthly.get(key, 0) + amt
+
+    # Build sorted list of last 6 months
+    now = datetime.now()
+    chart_data = []
+    for i in range(5, -1, -1):
+        d = now - timedelta(days=i * 30)
+        key = d.strftime("%Y-%m")
+        label = d.strftime("%b")
+        chart_data.append({"month": label, "amount": round(monthly.get(key, 0), 2)})
+
     return {
         "counts": counts,
         "total_submitted": len(all_expenses),
         "total_amount": total_amount,
         "pending_approvals": pending_approvals,
+        "chart_data": chart_data,
     }
 
 

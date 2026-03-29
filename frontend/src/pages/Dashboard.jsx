@@ -14,16 +14,6 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-const defaultChartData = [
-  { m: 'Jan', v: 0 },
-  { m: 'Feb', v: 0 },
-  { m: 'Mar', v: 0 },
-  { m: 'Apr', v: 0 },
-  { m: 'May', v: 0 },
-  { m: 'Jun', v: 0 },
-  { m: 'Jul', v: 0 },
-];
-
 export default function Dashboard() {
   const { user, company } = useAuth();
   const [stats, setStats] = useState(null);
@@ -37,6 +27,7 @@ export default function Dashboard() {
   const counts = stats?.counts || {};
   const pendingCount = (counts.PENDING || 0) + (counts.IN_PROGRESS || 0);
   const currency = company?.default_currency || 'USD';
+  const chartData = (stats?.chart_data || []).map((d) => ({ m: d.month, v: d.amount }));
 
   return (
     <Layout>
@@ -97,17 +88,17 @@ export default function Dashboard() {
           </div>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={defaultChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                 <XAxis dataKey="m" tick={{ fontSize: 11 }} stroke="#9ca3af" />
                 <YAxis
-                  tickFormatter={(v) => `$${v / 1000}k`}
-                  tick={{ fontSize: 11 }}
+                  tickFormatter={(v) => formatCurrency(v, currency)}
+                  tick={{ fontSize: 10 }}
                   stroke="#9ca3af"
-                  width={40}
+                  width={70}
                 />
                 <Tooltip
-                  formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Total']}
+                  formatter={(value) => [formatCurrency(Number(value), currency), 'Total']}
                   contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }}
                 />
                 <Line
