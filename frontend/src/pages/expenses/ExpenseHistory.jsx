@@ -1,182 +1,204 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import client from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import { EXPENSE_CATEGORIES, STATUS_COLORS } from '../../utils/constants';
+import { EXPENSE_CATEGORIES } from '../../utils/constants';
 import { formatCurrency } from '../../utils/formatCurrency';
-import { Filter, ChevronRight, FileText } from 'lucide-react';
+import { Upload, Plus, ChevronRight, FileText, ArrowRight, Send } from 'lucide-react';
+
+const STATUS_BADGE = {
+  DRAFT: 'border border-red-300 text-red-600 bg-red-50',
+  PENDING: 'border border-amber-300 text-amber-700 bg-amber-50',
+  IN_PROGRESS: 'border border-blue-300 text-blue-700 bg-blue-50',
+  APPROVED: 'border border-green-300 text-green-700 bg-green-50',
+  REJECTED: 'border border-red-300 text-red-600 bg-red-50',
+};
+
+const STATUS_LABEL = {
+  DRAFT: 'Draft',
+  PENDING: 'Submitted',
+  IN_PROGRESS: 'Submitted',
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+};
 
 export default function ExpenseHistory() {
-  const { user } = useAuth();
+  const { user, company } = useAuth();
   const navigate = useNavigate();
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ status: '', category: '' });
-  const [showFilters, setShowFilters] = useState(false);
+  const [submitting, setSubmitting] = useState(null);
 
   const fetchExpenses = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (filters.status) params.set('status', filters.status);
-      if (filters.category) params.set('category', filters.category);
-      const { data } = await client.get(`/expenses?${params.toString()}`);
+      const { data } = await client.get('/expenses');
       setExpenses(data);
-    } catch {
-      /* ignore */
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    fetchExpenses();
-  }, [filters]);
+  useEffect(() => { fetchExpenses(); }, []);
 
-  const statusCounts = expenses.reduce((acc, e) => {
-    acc[e.status] = (acc[e.status] || 0) + 1;
-    return acc;
-  }, {});
+  const handleSubmitDraft = async (expenseId) => {
+    setSubmitting(expenseId);
+    try {
+      await client.post(`/expenses/${expenseId}/submit`);
+      fetchExpenses();
+    } catch { /* ignore */ }
+    finally { setSubmitting(null); }
+  };
+
+  // Summary totals
+  const drafts = expenses.filter((e) => e.status === 'DRAFT');
+  const waiting = expenses.filter((e) => e.status === 'PENDING' || e.status === 'IN_PROGRESS');
+  const approved = expenses.filter((e) => e.status === 'APPROVED');
+  const currency = company?.default_currency || 'INR';
+
+  const sumAmount = (list) => list.reduce((acc, e) => acc + (e.converted_amount || e.amount), 0);
 
   return (
     <Layout>
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="font-display text-3xl font-bold uppercase tracking-tight text-navy">
-            My expenses
-          </h1>
-          <p className="mt-2 text-sm text-gray-600">{expenses.length} expense{expenses.length !== 1 ? 's' : ''} found</p>
+        <h1 className="font-display text-3xl font-bold uppercase tracking-tight text-navy">
+          My expenses
+        </h1>
+        <div className="flex items-center gap-2">
+          <Link to="/expenses/scan"
+            className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors text-sm">
+            <Upload size={16} /> Upload
+          </Link>
+          <Link to="/expenses/submit"
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary-400 hover:bg-primary-500 text-navy font-semibold rounded-lg transition-colors text-sm">
+            <Plus size={16} /> New
+          </Link>
         </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-semibold transition-colors ${
-            showFilters
-              ? 'border-primary-400 bg-primary-50 text-navy'
-              : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          <Filter size={16} />
-          Filters
-        </button>
       </div>
 
-      {/* Quick status tabs */}
-      <div className="flex gap-2 mb-5 flex-wrap">
-        {['', 'PENDING', 'APPROVED', 'REJECTED', 'IN_PROGRESS', 'DRAFT'].map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilters((f) => ({ ...f, status: s }))}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              filters.status === s
-                ? 'bg-navy text-white'
-                : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
-            }`}
-          >
-            {s || 'All'} {s ? `(${statusCounts[s] || 0})` : `(${expenses.length})`}
-          </button>
-        ))}
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <SummaryCard
+          label="To submit"
+          amount={sumAmount(drafts)}
+          currency={currency}
+          count={drafts.length}
+          color="bg-red-50 border-red-200"
+          textColor="text-red-700"
+        />
+        <SummaryCard
+          label="Waiting approval"
+          amount={sumAmount(waiting)}
+          currency={currency}
+          count={waiting.length}
+          color="bg-amber-50 border-amber-200"
+          textColor="text-amber-700"
+        />
+        <SummaryCard
+          label="Approved"
+          amount={sumAmount(approved)}
+          currency={currency}
+          count={approved.length}
+          color="bg-green-50 border-green-200"
+          textColor="text-green-700"
+        />
       </div>
 
-      {/* Extended filters */}
-      {showFilters && (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm mb-5 flex gap-4 flex-wrap items-end">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
-            <select
-              value={filters.category}
-              onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}
-              className="px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-400"
-            >
-              <option value="">All categories</option>
-              {EXPENSE_CATEGORIES.map((cat) => (
-                <option key={cat.value} value={cat.value}>{cat.label}</option>
-              ))}
-            </select>
-          </div>
-          <button
-            onClick={() => setFilters({ status: '', category: '' })}
-            className="px-3 py-2 text-xs font-semibold text-gray-500 hover:text-navy"
-          >
-            Clear all
-          </button>
-        </div>
-      )}
-
-      {/* Expense list */}
+      {/* Expenses table */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-gray-400 text-sm">Loading expenses...</div>
         ) : expenses.length === 0 ? (
           <div className="p-12 text-center">
             <FileText className="mx-auto mb-3 text-gray-300" size={40} />
-            <p className="text-sm text-gray-500">No expenses found</p>
-            <p className="text-xs text-gray-400 mt-1">Submit your first expense to get started</p>
+            <p className="text-sm text-gray-500">No expenses yet</p>
+            <p className="text-xs text-gray-400 mt-1">Upload a receipt or create a new expense to get started</p>
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="text-left px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
-                <th className="text-left px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
-                <th className="text-right px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
-                <th className="text-left px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="text-left px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                {user?.role !== 'EMPLOYEE' && (
-                  <th className="text-left px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Submitted by</th>
-                )}
-                <th className="px-6 py-3.5" />
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Employee</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Paid by</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Remarks</th>
+                <th className="text-right px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-3 py-3.5" />
               </tr>
             </thead>
             <tbody>
-              {expenses.map((expense) => (
-                <tr
-                  key={expense.id}
-                  onClick={() => navigate(`/approvals/${expense.id}`)}
-                  className="border-b border-gray-50 hover:bg-primary-50/20 transition-colors cursor-pointer"
-                >
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-medium text-navy truncate max-w-[240px]">{expense.description}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-xs text-gray-600 bg-gray-100 px-2.5 py-1 rounded-md font-medium">
-                      {EXPENSE_CATEGORIES.find((c) => c.value === expense.category)?.label || expense.category}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <p className="text-sm font-semibold text-navy">{formatCurrency(expense.amount, expense.currency)}</p>
-                    {expense.converted_amount && (
-                      <p className="text-[11px] text-gray-400">
-                        {formatCurrency(expense.converted_amount, expense.company_currency || 'USD')}
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-gray-600">
-                      {new Date(expense.expense_date).toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', year: 'numeric',
-                      })}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex px-2.5 py-1 rounded-md text-xs font-semibold ${STATUS_COLORS[expense.status] || 'bg-gray-100 text-gray-700'}`}>
-                      {expense.status.replace('_', ' ')}
-                    </span>
-                  </td>
-                  {user?.role !== 'EMPLOYEE' && (
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600">{expense.submitted_by_name}</span>
+              {expenses.map((expense) => {
+                const catLabel = EXPENSE_CATEGORIES.find((c) => c.value === expense.category)?.label || expense.category;
+                const isDraft = expense.status === 'DRAFT';
+                return (
+                  <tr
+                    key={expense.id}
+                    onClick={() => !isDraft && navigate(`/approvals/${expense.id}`)}
+                    className={`border-b border-gray-50 transition-colors ${isDraft ? '' : 'hover:bg-primary-50/20 cursor-pointer'}`}
+                  >
+                    <td className="px-5 py-3.5">
+                      <p className="font-medium text-navy">{expense.submitted_by_name || `${user?.first_name} ${user?.last_name}`}</p>
                     </td>
-                  )}
-                  <td className="px-6 py-4">
-                    <ChevronRight size={16} className="text-gray-300" />
-                  </td>
-                </tr>
-              ))}
+                    <td className="px-5 py-3.5">
+                      <p className="text-gray-700 truncate max-w-[180px]">{expense.description}</p>
+                    </td>
+                    <td className="px-5 py-3.5 text-gray-600">
+                      {new Date(expense.expense_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-5 py-3.5 text-gray-600">{catLabel}</td>
+                    <td className="px-5 py-3.5 text-gray-600">
+                      {expense.paid_by === 'COMPANY' ? 'Company' : user?.first_name || 'Self'}
+                    </td>
+                    <td className="px-5 py-3.5 text-gray-500 truncate max-w-[120px]">
+                      {expense.remarks || 'None'}
+                    </td>
+                    <td className="px-5 py-3.5 text-right font-semibold text-navy">
+                      {formatCurrency(expense.amount, expense.currency)}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold ${STATUS_BADGE[expense.status] || STATUS_BADGE.DRAFT}`}>
+                          {STATUS_LABEL[expense.status] || expense.status}
+                        </span>
+                        {isDraft && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleSubmitDraft(expense.id); }}
+                            disabled={submitting === expense.id}
+                            className="flex items-center gap-1 px-2 py-1 bg-navy text-white rounded-md text-[10px] font-semibold hover:bg-navy-muted transition-colors disabled:opacity-50"
+                          >
+                            <Send size={10} />
+                            {submitting === expense.id ? '...' : 'Submit'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3.5">
+                      {!isDraft && <ChevronRight size={14} className="text-gray-300" />}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
     </Layout>
+  );
+}
+
+function SummaryCard({ label, amount, currency, count, color, textColor }) {
+  return (
+    <div className={`rounded-xl border p-5 ${color}`}>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-2xl font-bold text-navy">{formatCurrency(amount, currency)}</p>
+        <ArrowRight size={16} className="text-gray-400" />
+      </div>
+      <p className={`text-xs font-semibold ${textColor}`}>
+        {label} <span className="text-gray-400 font-normal">({count})</span>
+      </p>
+    </div>
   );
 }

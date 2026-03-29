@@ -73,6 +73,40 @@ async def create_and_submit_expense(
     return serialize_expense(submitted)
 
 
+@router.post("/draft")
+async def save_draft_expense(
+    req: CreateExpenseRequest,
+    current_user=Depends(get_current_user),
+):
+    """Save an expense as draft without submitting."""
+    expense = await create_expense(
+        user_id=current_user.id,
+        company_id=current_user.companyId,
+        amount=req.amount,
+        currency=req.currency,
+        category=req.category,
+        description=req.description,
+        remarks=req.remarks,
+        paid_by=req.paid_by,
+        expense_date=req.expense_date,
+        is_manager_approver=req.is_manager_approver,
+        receipt_url=req.receipt_url,
+        ocr_vendor_name=req.ocr_vendor_name,
+        ocr_raw_data=req.ocr_raw_data,
+    )
+    return serialize_expense(expense)
+
+
+@router.post("/{expense_id}/submit")
+async def submit_draft(
+    expense_id: str,
+    current_user=Depends(get_current_user),
+):
+    """Submit a previously saved draft expense."""
+    submitted = await submit_expense(expense_id, current_user.id)
+    return serialize_expense(submitted)
+
+
 @router.get("/")
 async def list_expenses(
     current_user=Depends(get_current_user),

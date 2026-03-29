@@ -34,6 +34,17 @@ export default function SubmitExpense() {
     setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
+  const buildPayload = () => ({
+    amount: parseFloat(form.amount),
+    currency: form.currency,
+    category: form.category,
+    description: form.description,
+    remarks: form.remarks || null,
+    paid_by: form.paid_by,
+    expense_date: new Date(form.expense_date).toISOString(),
+    is_manager_approver: form.is_manager_approver,
+  });
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -42,21 +53,29 @@ export default function SubmitExpense() {
 
     setLoading(true);
     try {
-      await client.post('/expenses', {
-        amount: parseFloat(form.amount),
-        currency: form.currency,
-        category: form.category,
-        description: form.description,
-        remarks: form.remarks || null,
-        paid_by: form.paid_by,
-        expense_date: new Date(form.expense_date).toISOString(),
-        is_manager_approver: form.is_manager_approver,
-      });
+      await client.post('/expenses', buildPayload());
       navigate('/expenses');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to submit expense');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [savingDraft, setSavingDraft] = useState(false);
+  const handleSaveDraft = async () => {
+    setError('');
+    if (!form.amount || parseFloat(form.amount) <= 0) { setError('Enter a valid amount'); return; }
+    if (!form.category) { setError('Select a category'); return; }
+
+    setSavingDraft(true);
+    try {
+      await client.post('/expenses/draft', buildPayload());
+      navigate('/expenses');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to save draft');
+    } finally {
+      setSavingDraft(false);
     }
   };
 
@@ -179,15 +198,21 @@ export default function SubmitExpense() {
                 </label>
               )}
 
-              {/* Submit */}
-              <button type="submit" disabled={loading}
-                className="flex items-center justify-center gap-2 w-full py-3 bg-primary-400 hover:bg-primary-500 text-navy font-semibold rounded-lg transition-colors text-sm disabled:opacity-50">
-                <Send size={16} />
-                {loading ? 'Submitting...' : 'Submit'}
-              </button>
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <button type="button" onClick={handleSaveDraft} disabled={savingDraft || loading}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors text-sm disabled:opacity-50">
+                  {savingDraft ? 'Saving...' : 'Save as draft'}
+                </button>
+                <button type="submit" disabled={loading || savingDraft}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary-400 hover:bg-primary-500 text-navy font-semibold rounded-lg transition-colors text-sm disabled:opacity-50">
+                  <Send size={16} />
+                  {loading ? 'Submitting...' : 'Submit'}
+                </button>
+              </div>
 
               <p className="text-[11px] text-gray-400 text-center">
-                Once submitted, this record becomes read-only and enters the approval workflow.
+                <strong>Submit</strong> sends for approval immediately. <strong>Save as draft</strong> lets you review first.
               </p>
             </form>
           </div>
