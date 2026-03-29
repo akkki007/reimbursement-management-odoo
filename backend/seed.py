@@ -1,6 +1,6 @@
 """
 Seed script for ReimburseFlow.
-Creates a company, users (admin, managers, employees), approval rules, and sample expenses.
+Creates a realistic demo dataset: company, users, approval rules, and expenses in various states.
 
 Usage:
     cd backend
@@ -15,13 +15,13 @@ from app.services.auth_service import hash_password
 
 db = Prisma()
 
-PASSWORD = "password123"  # default password for all seed users
+PASSWORD = "password123"
 
 
 async def main():
     await db.connect()
 
-    # Clean existing data (order matters for FK constraints)
+    # ── Clean existing data (FK order) ──────────────
     await db.approvalaction.delete_many()
     await db.approvalstep.delete_many()
     await db.expense.delete_many()
@@ -30,122 +30,165 @@ async def main():
     await db.user.delete_many()
     await db.company.delete_many()
 
-    print("Cleaned existing data.")
+    print("Cleaned existing data.\n")
 
-    # ── Company ──────────────────────────────────────
+    now = datetime.now(timezone.utc)
+
+    # ════════════════════════════════════════════════
+    #  COMPANY
+    # ════════════════════════════════════════════════
     company = await db.company.create(
         data={
-            "name": "Acme Corporation",
+            "name": "TechNova Solutions",
             "country": "India",
             "defaultCurrency": "INR",
         }
     )
-    print(f"Created company: {company.name} (currency: {company.defaultCurrency})")
+    print(f"Company: {company.name} ({company.defaultCurrency})")
 
-    # ── Users ────────────────────────────────────────
+    # ════════════════════════════════════════════════
+    #  USERS
+    # ════════════════════════════════════════════════
+
+    # --- Admin ---
     admin = await db.user.create(
         data={
-            "email": "admin@acme.com",
+            "email": "admin@technova.com",
             "passwordHash": hash_password(PASSWORD),
-            "firstName": "Marc",
-            "lastName": "Admin",
+            "firstName": "Rajesh",
+            "lastName": "Kapoor",
             "role": "ADMIN",
             "companyId": company.id,
         }
     )
-    print(f"Created admin: {admin.email}")
 
-    manager_john = await db.user.create(
+    # --- Managers ---
+    mgr_priya = await db.user.create(
         data={
-            "email": "john@acme.com",
+            "email": "priya@technova.com",
             "passwordHash": hash_password(PASSWORD),
-            "firstName": "John",
-            "lastName": "Manager",
+            "firstName": "Priya",
+            "lastName": "Sharma",
             "role": "MANAGER",
             "companyId": company.id,
         }
     )
 
-    manager_sarah = await db.user.create(
+    mgr_arjun = await db.user.create(
         data={
-            "email": "sarah@acme.com",
+            "email": "arjun@technova.com",
             "passwordHash": hash_password(PASSWORD),
-            "firstName": "Sarah",
-            "lastName": "Finance",
+            "firstName": "Arjun",
+            "lastName": "Mehta",
             "role": "MANAGER",
             "companyId": company.id,
         }
     )
 
-    mitchell = await db.user.create(
+    mgr_neha = await db.user.create(
         data={
-            "email": "mitchell@acme.com",
+            "email": "neha@technova.com",
             "passwordHash": hash_password(PASSWORD),
-            "firstName": "Mitchell",
-            "lastName": "Reviewer",
+            "firstName": "Neha",
+            "lastName": "Gupta",
             "role": "MANAGER",
             "companyId": company.id,
         }
     )
 
-    emp_alice = await db.user.create(
+    # --- Employees (under Priya) ---
+    emp_ankit = await db.user.create(
         data={
-            "email": "alice@acme.com",
+            "email": "ankit@technova.com",
             "passwordHash": hash_password(PASSWORD),
-            "firstName": "Alice",
-            "lastName": "Developer",
+            "firstName": "Ankit",
+            "lastName": "Verma",
             "role": "EMPLOYEE",
             "companyId": company.id,
-            "managerId": manager_john.id,
+            "managerId": mgr_priya.id,
         }
     )
 
-    emp_bob = await db.user.create(
+    emp_divya = await db.user.create(
         data={
-            "email": "bob@acme.com",
+            "email": "divya@technova.com",
             "passwordHash": hash_password(PASSWORD),
-            "firstName": "Bob",
-            "lastName": "Designer",
+            "firstName": "Divya",
+            "lastName": "Patel",
             "role": "EMPLOYEE",
             "companyId": company.id,
-            "managerId": manager_sarah.id,
+            "managerId": mgr_priya.id,
         }
     )
 
-    emp_carol = await db.user.create(
+    # --- Employees (under Arjun) ---
+    emp_rohan = await db.user.create(
         data={
-            "email": "carol@acme.com",
+            "email": "rohan@technova.com",
             "passwordHash": hash_password(PASSWORD),
-            "firstName": "Carol",
-            "lastName": "Marketing",
+            "firstName": "Rohan",
+            "lastName": "Singh",
             "role": "EMPLOYEE",
             "companyId": company.id,
-            "managerId": manager_john.id,
+            "managerId": mgr_arjun.id,
         }
     )
 
-    print(f"Created 3 managers: John, Sarah, Mitchell")
-    print(f"Created 3 employees: Alice (→John), Bob (→Sarah), Carol (→John)")
+    emp_meera = await db.user.create(
+        data={
+            "email": "meera@technova.com",
+            "passwordHash": hash_password(PASSWORD),
+            "firstName": "Meera",
+            "lastName": "Iyer",
+            "role": "EMPLOYEE",
+            "companyId": company.id,
+            "managerId": mgr_arjun.id,
+        }
+    )
 
-    # ── Approval Rules ───────────────────────────────
+    # --- Employee (under Neha) ---
+    emp_karan = await db.user.create(
+        data={
+            "email": "karan@technova.com",
+            "passwordHash": hash_password(PASSWORD),
+            "firstName": "Karan",
+            "lastName": "Joshi",
+            "role": "EMPLOYEE",
+            "companyId": company.id,
+            "managerId": mgr_neha.id,
+        }
+    )
 
-    # Rule 1: Sequential 3-step approval (default)
+    print(f"Admin:     {admin.email}")
+    print(f"Managers:  {mgr_priya.email}, {mgr_arjun.email}, {mgr_neha.email}")
+    print(f"Employees: {emp_ankit.email} (->Priya), {emp_divya.email} (->Priya)")
+    print(f"           {emp_rohan.email} (->Arjun), {emp_meera.email} (->Arjun)")
+    print(f"           {emp_karan.email} (->Neha)")
+
+    # ════════════════════════════════════════════════
+    #  APPROVAL RULES
+    # ════════════════════════════════════════════════
+
+    # Rule 1: Standard sequential (DEFAULT)
+    # Priya (Team Lead) → Neha (Finance) → Arjun (Director)
     rule1 = await db.approvalrule.create(
         data={
             "companyId": company.id,
-            "name": "Standard 3-Step Approval",
-            "description": "Sequential approval: John → Mitchell → Sarah. John is required.",
+            "name": "Standard Sequential Approval",
+            "description": "3-step sequential: Team Lead -> Finance -> Director. 60% threshold.",
             "ruleType": "PERCENTAGE",
             "percentRequired": 0.6,
             "isSequential": True,
-            "isManagerApprover": True,
+            "isManagerApprover": False,
             "isDefault": True,
         }
     )
-    await db.approvalrulestep.create(data={"approvalRuleId": rule1.id, "stepOrder": 1, "approverId": manager_john.id, "stepLabel": "Team Lead", "isRequired": True})
-    await db.approvalrulestep.create(data={"approvalRuleId": rule1.id, "stepOrder": 2, "approverId": mitchell.id, "stepLabel": "Reviewer"})
-    await db.approvalrulestep.create(data={"approvalRuleId": rule1.id, "stepOrder": 3, "approverId": manager_sarah.id, "stepLabel": "Finance"})
-    print(f"Created rule: {rule1.name} (sequential, default)")
+    await db.approvalrulestep.create(data={"approvalRuleId": rule1.id, "stepOrder": 1, "approverId": mgr_priya.id, "stepLabel": "Team Lead", "isRequired": True})
+    await db.approvalrulestep.create(data={"approvalRuleId": rule1.id, "stepOrder": 2, "approverId": mgr_neha.id, "stepLabel": "Finance", "isRequired": False})
+    await db.approvalrulestep.create(data={"approvalRuleId": rule1.id, "stepOrder": 3, "approverId": mgr_arjun.id, "stepLabel": "Director", "isRequired": False})
+    print(f"\nRule 1: {rule1.name} (sequential, DEFAULT)")
+    print(f"  Steps: Priya (Team Lead, required) -> Neha (Finance) -> Arjun (Director)")
+    print(f"  Auto-approves at 60% (2 of 3 approvals)")
 
     # Rule 2: Parallel approval
     rule2 = await db.approvalrule.create(
@@ -160,124 +203,309 @@ async def main():
             "isDefault": False,
         }
     )
-    await db.approvalrulestep.create(data={"approvalRuleId": rule2.id, "stepOrder": 1, "approverId": manager_john.id, "stepLabel": "Team Lead", "isRequired": False})
-    await db.approvalrulestep.create(data={"approvalRuleId": rule2.id, "stepOrder": 2, "approverId": manager_sarah.id, "stepLabel": "Finance", "isRequired": True})
-    print(f"Created rule: {rule2.name} (parallel)")
+    await db.approvalrulestep.create(data={"approvalRuleId": rule2.id, "stepOrder": 1, "approverId": mgr_priya.id, "stepLabel": "Team Lead"})
+    await db.approvalrulestep.create(data={"approvalRuleId": rule2.id, "stepOrder": 2, "approverId": mgr_neha.id, "stepLabel": "Finance", "isRequired": True})
+    print(f"\nRule 2: {rule2.name} (parallel)")
+    print(f"  Steps: Priya (Team Lead) + Neha (Finance, required) — 50% threshold")
 
-    # ── Sample Expenses ──────────────────────────────
-    now = datetime.now(timezone.utc)
-
-    # Expense 1: Alice's pending expense
-    exp1 = await db.expense.create(
+    # Rule 3: Hybrid with specific user (CFO auto-approve)
+    rule3 = await db.approvalrule.create(
         data={
             "companyId": company.id,
-            "submittedById": emp_alice.id,
-            "amount": 2500.00,
+            "name": "High-Value Hybrid Approval",
+            "description": "Director can auto-approve at any step. Otherwise 100% needed.",
+            "ruleType": "HYBRID",
+            "percentRequired": 1.0,
+            "specificUserId": mgr_arjun.id,
+            "isSequential": True,
+            "isManagerApprover": False,
+            "isDefault": False,
+        }
+    )
+    await db.approvalrulestep.create(data={"approvalRuleId": rule3.id, "stepOrder": 1, "approverId": mgr_priya.id, "stepLabel": "Team Lead", "isRequired": True})
+    await db.approvalrulestep.create(data={"approvalRuleId": rule3.id, "stepOrder": 2, "approverId": mgr_arjun.id, "stepLabel": "Director", "isRequired": True})
+    await db.approvalrulestep.create(data={"approvalRuleId": rule3.id, "stepOrder": 3, "approverId": mgr_neha.id, "stepLabel": "Finance", "isRequired": True})
+    print(f"\nRule 3: {rule3.name} (hybrid)")
+    print(f"  Steps: Priya -> Arjun (auto-approve power) -> Neha — 100% or Arjun skips rest")
+
+    # ════════════════════════════════════════════════
+    #  EXPENSES — various statuses for demo
+    # ════════════════════════════════════════════════
+
+    print("\n--- Expenses ---")
+
+    # ── 1. DRAFT — Ankit saved but hasn't submitted ──
+    exp_draft = await db.expense.create(
+        data={
+            "companyId": company.id,
+            "submittedById": emp_ankit.id,
+            "amount": 1200.00,
+            "currency": "INR",
+            "category": "OFFICE_SUPPLIES",
+            "description": "Ergonomic keyboard and mouse",
+            "remarks": "Recommended by doctor for RSI prevention",
+            "paidBy": "EMPLOYEE",
+            "expenseDate": (now - timedelta(days=1)),
+            "status": "DRAFT",
+        }
+    )
+    print(f"  DRAFT:       {exp_draft.description} (Ankit)")
+
+    # ── 2. PENDING — Divya just submitted, waiting on step 1 ──
+    exp_pending1 = await db.expense.create(
+        data={
+            "companyId": company.id,
+            "submittedById": emp_divya.id,
+            "amount": 4500.00,
             "currency": "INR",
             "category": "TRAVEL",
-            "description": "Train tickets to Mumbai for client meeting",
+            "description": "Cab fare for client visit to Pune office",
+            "paidBy": "EMPLOYEE",
             "expenseDate": (now - timedelta(days=2)),
             "status": "PENDING",
-            "isManagerApprover": True,
             "currentStepOrder": 0,
         }
     )
-    # Create approval steps for exp1 (manager first, then rule steps)
-    await db.approvalstep.create(data={"expenseId": exp1.id, "approverId": manager_john.id, "stepOrder": 0, "stepLabel": "Manager", "isRequired": True, "status": "AWAITING"})
-    await db.approvalstep.create(data={"expenseId": exp1.id, "approverId": manager_john.id, "stepOrder": 1, "stepLabel": "Team Lead", "isRequired": True, "status": "PENDING"})
-    await db.approvalstep.create(data={"expenseId": exp1.id, "approverId": mitchell.id, "stepOrder": 2, "stepLabel": "Reviewer", "isRequired": False, "status": "PENDING"})
-    await db.approvalstep.create(data={"expenseId": exp1.id, "approverId": manager_sarah.id, "stepOrder": 3, "stepLabel": "Finance", "isRequired": False, "status": "PENDING"})
-    print(f"Created expense: {exp1.description} (PENDING, awaiting John)")
+    await db.approvalstep.create(data={"expenseId": exp_pending1.id, "approverId": mgr_priya.id, "stepOrder": 0, "stepLabel": "Team Lead", "isRequired": True, "status": "AWAITING"})
+    await db.approvalstep.create(data={"expenseId": exp_pending1.id, "approverId": mgr_neha.id, "stepOrder": 1, "stepLabel": "Finance", "status": "PENDING"})
+    await db.approvalstep.create(data={"expenseId": exp_pending1.id, "approverId": mgr_arjun.id, "stepOrder": 2, "stepLabel": "Director", "status": "PENDING"})
+    print(f"  PENDING:     {exp_pending1.description} (Divya -> awaiting Priya)")
 
-    # Expense 2: Bob's approved expense
-    exp2 = await db.expense.create(
+    # ── 3. PENDING — Rohan submitted a foreign currency expense ──
+    exp_pending2 = await db.expense.create(
         data={
             "companyId": company.id,
-            "submittedById": emp_bob.id,
-            "amount": 45.99,
+            "submittedById": emp_rohan.id,
+            "amount": 89.99,
             "currency": "USD",
-            "convertedAmount": 3839.57,
-            "exchangeRate": 83.48,
-            "category": "MEALS",
-            "description": "Team lunch at restaurant",
-            "expenseDate": (now - timedelta(days=5)),
-            "status": "APPROVED",
-            "isManagerApprover": False,
-            "currentStepOrder": 1,
-        }
-    )
-    await db.approvalstep.create(data={"expenseId": exp2.id, "approverId": manager_sarah.id, "stepOrder": 0, "stepLabel": "Finance", "isRequired": True, "status": "APPROVED"})
-    await db.approvalaction.create(data={"expenseId": exp2.id, "actorId": manager_sarah.id, "action": "APPROVED", "comment": "Looks good, approved."})
-    print(f"Created expense: {exp2.description} (APPROVED)")
-
-    # Expense 3: Carol's rejected expense
-    exp3 = await db.expense.create(
-        data={
-            "companyId": company.id,
-            "submittedById": emp_carol.id,
-            "amount": 15000.00,
-            "currency": "INR",
-            "category": "ENTERTAINMENT",
-            "description": "VIP concert tickets for client entertainment",
+            "convertedAmount": 7511.57,
+            "exchangeRate": 83.47,
+            "category": "SOFTWARE",
+            "description": "Annual GitHub Copilot subscription",
+            "paidBy": "EMPLOYEE",
             "expenseDate": (now - timedelta(days=3)),
-            "status": "REJECTED",
-            "isManagerApprover": True,
+            "status": "PENDING",
             "currentStepOrder": 0,
         }
     )
-    await db.approvalstep.create(data={"expenseId": exp3.id, "approverId": manager_john.id, "stepOrder": 0, "stepLabel": "Manager", "isRequired": True, "status": "REJECTED"})
-    await db.approvalaction.create(data={"expenseId": exp3.id, "actorId": manager_john.id, "action": "REJECTED", "comment": "Amount too high for entertainment. Please get pre-approval."})
-    print(f"Created expense: {exp3.description} (REJECTED)")
+    await db.approvalstep.create(data={"expenseId": exp_pending2.id, "approverId": mgr_priya.id, "stepOrder": 0, "stepLabel": "Team Lead", "isRequired": True, "status": "AWAITING"})
+    await db.approvalstep.create(data={"expenseId": exp_pending2.id, "approverId": mgr_neha.id, "stepOrder": 1, "stepLabel": "Finance", "status": "PENDING"})
+    await db.approvalstep.create(data={"expenseId": exp_pending2.id, "approverId": mgr_arjun.id, "stepOrder": 2, "stepLabel": "Director", "status": "PENDING"})
+    print(f"  PENDING:     {exp_pending2.description} (Rohan, $89.99 -> INR 7,511.57)")
 
-    # Expense 4: Alice's another pending expense
-    exp4 = await db.expense.create(
+    # ── 4. PENDING — Karan's meal expense ──
+    exp_pending3 = await db.expense.create(
         data={
             "companyId": company.id,
-            "submittedById": emp_alice.id,
-            "amount": 850.00,
+            "submittedById": emp_karan.id,
+            "amount": 1850.00,
             "currency": "INR",
-            "category": "SOFTWARE",
-            "description": "Annual Figma license renewal",
+            "category": "MEALS",
+            "description": "Team dinner after product launch",
+            "paidBy": "EMPLOYEE",
             "expenseDate": (now - timedelta(days=1)),
             "status": "PENDING",
-            "isManagerApprover": False,
             "currentStepOrder": 0,
         }
     )
-    await db.approvalstep.create(data={"expenseId": exp4.id, "approverId": manager_john.id, "stepOrder": 0, "stepLabel": "Team Lead", "isRequired": True, "status": "AWAITING"})
-    await db.approvalstep.create(data={"expenseId": exp4.id, "approverId": mitchell.id, "stepOrder": 1, "stepLabel": "Reviewer", "isRequired": False, "status": "PENDING"})
-    await db.approvalstep.create(data={"expenseId": exp4.id, "approverId": manager_sarah.id, "stepOrder": 2, "stepLabel": "Finance", "isRequired": False, "status": "PENDING"})
-    print(f"Created expense: {exp4.description} (PENDING, awaiting John)")
+    await db.approvalstep.create(data={"expenseId": exp_pending3.id, "approverId": mgr_priya.id, "stepOrder": 0, "stepLabel": "Team Lead", "isRequired": True, "status": "AWAITING"})
+    await db.approvalstep.create(data={"expenseId": exp_pending3.id, "approverId": mgr_neha.id, "stepOrder": 1, "stepLabel": "Finance", "status": "PENDING"})
+    await db.approvalstep.create(data={"expenseId": exp_pending3.id, "approverId": mgr_arjun.id, "stepOrder": 2, "stepLabel": "Director", "status": "PENDING"})
+    print(f"  PENDING:     {exp_pending3.description} (Karan -> awaiting Priya)")
 
-    # Expense 5: Bob's in-progress expense
-    exp5 = await db.expense.create(
+    # ── 5. IN_PROGRESS — Meera's expense, step 1 approved, step 2 awaiting ──
+    exp_progress = await db.expense.create(
         data={
             "companyId": company.id,
-            "submittedById": emp_bob.id,
-            "amount": 3200.00,
+            "submittedById": emp_meera.id,
+            "amount": 12000.00,
             "currency": "INR",
             "category": "ACCOMMODATION",
-            "description": "Hotel stay for 2 nights - Bangalore trip",
-            "expenseDate": (now - timedelta(days=4)),
+            "description": "Hotel stay for 3 nights - Bangalore conference",
+            "paidBy": "EMPLOYEE",
+            "expenseDate": (now - timedelta(days=5)),
             "status": "IN_PROGRESS",
-            "isManagerApprover": True,
             "currentStepOrder": 1,
         }
     )
-    await db.approvalstep.create(data={"expenseId": exp5.id, "approverId": manager_sarah.id, "stepOrder": 0, "stepLabel": "Manager", "isRequired": True, "status": "APPROVED"})
-    await db.approvalstep.create(data={"expenseId": exp5.id, "approverId": manager_john.id, "stepOrder": 1, "stepLabel": "Team Lead", "isRequired": True, "status": "AWAITING"})
-    await db.approvalstep.create(data={"expenseId": exp5.id, "approverId": mitchell.id, "stepOrder": 2, "stepLabel": "Reviewer", "isRequired": False, "status": "PENDING"})
-    await db.approvalaction.create(data={"expenseId": exp5.id, "actorId": manager_sarah.id, "action": "APPROVED", "comment": "Manager approved."})
-    print(f"Created expense: {exp5.description} (IN_PROGRESS, step 2)")
+    await db.approvalstep.create(data={"expenseId": exp_progress.id, "approverId": mgr_priya.id, "stepOrder": 0, "stepLabel": "Team Lead", "isRequired": True, "status": "APPROVED"})
+    await db.approvalstep.create(data={"expenseId": exp_progress.id, "approverId": mgr_neha.id, "stepOrder": 1, "stepLabel": "Finance", "status": "AWAITING"})
+    await db.approvalstep.create(data={"expenseId": exp_progress.id, "approverId": mgr_arjun.id, "stepOrder": 2, "stepLabel": "Director", "status": "PENDING"})
+    await db.approvalaction.create(data={"expenseId": exp_progress.id, "actorId": mgr_priya.id, "action": "APPROVED", "comment": "Conference attendance approved by VP."})
+    print(f"  IN_PROGRESS: {exp_progress.description} (Meera, step 1 done -> awaiting Neha)")
+
+    # ── 6. IN_PROGRESS — Ankit's transport, step 1 done ──
+    exp_progress2 = await db.expense.create(
+        data={
+            "companyId": company.id,
+            "submittedById": emp_ankit.id,
+            "amount": 3500.00,
+            "currency": "INR",
+            "category": "TRANSPORT",
+            "description": "Airport pickup and drop for client visit",
+            "paidBy": "COMPANY",
+            "expenseDate": (now - timedelta(days=4)),
+            "status": "IN_PROGRESS",
+            "currentStepOrder": 1,
+        }
+    )
+    await db.approvalstep.create(data={"expenseId": exp_progress2.id, "approverId": mgr_priya.id, "stepOrder": 0, "stepLabel": "Team Lead", "isRequired": True, "status": "APPROVED"})
+    await db.approvalstep.create(data={"expenseId": exp_progress2.id, "approverId": mgr_neha.id, "stepOrder": 1, "stepLabel": "Finance", "status": "AWAITING"})
+    await db.approvalstep.create(data={"expenseId": exp_progress2.id, "approverId": mgr_arjun.id, "stepOrder": 2, "stepLabel": "Director", "status": "PENDING"})
+    await db.approvalaction.create(data={"expenseId": exp_progress2.id, "actorId": mgr_priya.id, "action": "APPROVED", "comment": "Client visit verified."})
+    print(f"  IN_PROGRESS: {exp_progress2.description} (Ankit, step 1 done -> awaiting Neha)")
+
+    # ── 7. APPROVED — Divya's flight (fully approved) ──
+    exp_approved1 = await db.expense.create(
+        data={
+            "companyId": company.id,
+            "submittedById": emp_divya.id,
+            "amount": 8500.00,
+            "currency": "INR",
+            "category": "TRAVEL",
+            "description": "Return flight tickets Delhi-Mumbai",
+            "paidBy": "EMPLOYEE",
+            "expenseDate": (now - timedelta(days=10)),
+            "status": "APPROVED",
+            "currentStepOrder": 2,
+        }
+    )
+    await db.approvalstep.create(data={"expenseId": exp_approved1.id, "approverId": mgr_priya.id, "stepOrder": 0, "stepLabel": "Team Lead", "isRequired": True, "status": "APPROVED"})
+    await db.approvalstep.create(data={"expenseId": exp_approved1.id, "approverId": mgr_neha.id, "stepOrder": 1, "stepLabel": "Finance", "status": "APPROVED"})
+    await db.approvalstep.create(data={"expenseId": exp_approved1.id, "approverId": mgr_arjun.id, "stepOrder": 2, "stepLabel": "Director", "status": "SKIPPED"})
+    await db.approvalaction.create(data={"expenseId": exp_approved1.id, "actorId": mgr_priya.id, "action": "APPROVED", "comment": "Pre-approved travel."})
+    await db.approvalaction.create(data={"expenseId": exp_approved1.id, "actorId": mgr_neha.id, "action": "APPROVED", "comment": "Within budget. 60% threshold met."})
+    print(f"  APPROVED:    {exp_approved1.description} (Divya, 2/3 approved -> 60% auto-approved)")
+
+    # ── 8. APPROVED — Rohan's meals (foreign currency) ──
+    exp_approved2 = await db.expense.create(
+        data={
+            "companyId": company.id,
+            "submittedById": emp_rohan.id,
+            "amount": 35.50,
+            "currency": "EUR",
+            "convertedAmount": 3230.05,
+            "exchangeRate": 90.99,
+            "category": "MEALS",
+            "description": "Client dinner in Berlin",
+            "paidBy": "EMPLOYEE",
+            "expenseDate": (now - timedelta(days=8)),
+            "status": "APPROVED",
+            "currentStepOrder": 2,
+        }
+    )
+    await db.approvalstep.create(data={"expenseId": exp_approved2.id, "approverId": mgr_priya.id, "stepOrder": 0, "stepLabel": "Team Lead", "isRequired": True, "status": "APPROVED"})
+    await db.approvalstep.create(data={"expenseId": exp_approved2.id, "approverId": mgr_neha.id, "stepOrder": 1, "stepLabel": "Finance", "status": "APPROVED"})
+    await db.approvalstep.create(data={"expenseId": exp_approved2.id, "approverId": mgr_arjun.id, "stepOrder": 2, "stepLabel": "Director", "status": "SKIPPED"})
+    await db.approvalaction.create(data={"expenseId": exp_approved2.id, "actorId": mgr_priya.id, "action": "APPROVED"})
+    await db.approvalaction.create(data={"expenseId": exp_approved2.id, "actorId": mgr_neha.id, "action": "APPROVED", "comment": "Currency converted correctly."})
+    print(f"  APPROVED:    {exp_approved2.description} (Rohan, EUR 35.50 -> INR 3,230.05)")
+
+    # ── 9. APPROVED — Karan's software (admin override) ──
+    exp_override = await db.expense.create(
+        data={
+            "companyId": company.id,
+            "submittedById": emp_karan.id,
+            "amount": 2400.00,
+            "currency": "INR",
+            "category": "SOFTWARE",
+            "description": "JetBrains IDE annual license",
+            "paidBy": "EMPLOYEE",
+            "expenseDate": (now - timedelta(days=12)),
+            "status": "APPROVED",
+            "currentStepOrder": 0,
+        }
+    )
+    await db.approvalstep.create(data={"expenseId": exp_override.id, "approverId": mgr_priya.id, "stepOrder": 0, "stepLabel": "Team Lead", "isRequired": True, "status": "SKIPPED"})
+    await db.approvalstep.create(data={"expenseId": exp_override.id, "approverId": mgr_neha.id, "stepOrder": 1, "stepLabel": "Finance", "status": "SKIPPED"})
+    await db.approvalaction.create(data={"expenseId": exp_override.id, "actorId": admin.id, "action": "OVERRIDE_APPROVED", "comment": "Bulk license purchase pre-approved by CTO."})
+    print(f"  APPROVED:    {exp_override.description} (Karan, admin override by Rajesh)")
+
+    # ── 10. REJECTED — Meera's entertainment (rejected at step 1) ──
+    exp_rejected1 = await db.expense.create(
+        data={
+            "companyId": company.id,
+            "submittedById": emp_meera.id,
+            "amount": 25000.00,
+            "currency": "INR",
+            "category": "ENTERTAINMENT",
+            "description": "Corporate box tickets for IPL match",
+            "paidBy": "EMPLOYEE",
+            "expenseDate": (now - timedelta(days=6)),
+            "status": "REJECTED",
+            "currentStepOrder": 0,
+        }
+    )
+    await db.approvalstep.create(data={"expenseId": exp_rejected1.id, "approverId": mgr_priya.id, "stepOrder": 0, "stepLabel": "Team Lead", "isRequired": True, "status": "REJECTED"})
+    await db.approvalstep.create(data={"expenseId": exp_rejected1.id, "approverId": mgr_neha.id, "stepOrder": 1, "stepLabel": "Finance", "status": "PENDING"})
+    await db.approvalstep.create(data={"expenseId": exp_rejected1.id, "approverId": mgr_arjun.id, "stepOrder": 2, "stepLabel": "Director", "status": "PENDING"})
+    await db.approvalaction.create(data={"expenseId": exp_rejected1.id, "actorId": mgr_priya.id, "action": "REJECTED", "comment": "Entertainment expenses above 10K need pre-approval from Director."})
+    print(f"  REJECTED:    {exp_rejected1.description} (Meera, rejected by Priya)")
+
+    # ── 11. REJECTED — Ankit's expense (rejected at step 2) ──
+    exp_rejected2 = await db.expense.create(
+        data={
+            "companyId": company.id,
+            "submittedById": emp_ankit.id,
+            "amount": 18000.00,
+            "currency": "INR",
+            "category": "TRAVEL",
+            "description": "Business class upgrade for domestic flight",
+            "paidBy": "EMPLOYEE",
+            "expenseDate": (now - timedelta(days=7)),
+            "status": "REJECTED",
+            "currentStepOrder": 1,
+        }
+    )
+    await db.approvalstep.create(data={"expenseId": exp_rejected2.id, "approverId": mgr_priya.id, "stepOrder": 0, "stepLabel": "Team Lead", "isRequired": True, "status": "APPROVED"})
+    await db.approvalstep.create(data={"expenseId": exp_rejected2.id, "approverId": mgr_neha.id, "stepOrder": 1, "stepLabel": "Finance", "status": "REJECTED"})
+    await db.approvalstep.create(data={"expenseId": exp_rejected2.id, "approverId": mgr_arjun.id, "stepOrder": 2, "stepLabel": "Director", "status": "PENDING"})
+    await db.approvalaction.create(data={"expenseId": exp_rejected2.id, "actorId": mgr_priya.id, "action": "APPROVED", "comment": "Travel is valid."})
+    await db.approvalaction.create(data={"expenseId": exp_rejected2.id, "actorId": mgr_neha.id, "action": "REJECTED", "comment": "Company policy: economy class only for domestic. Please rebook."})
+    print(f"  REJECTED:    {exp_rejected2.description} (Ankit, approved by Priya, rejected by Neha)")
+
+    # ── 12. PENDING — Divya's recent expense ──
+    exp_pending4 = await db.expense.create(
+        data={
+            "companyId": company.id,
+            "submittedById": emp_divya.id,
+            "amount": 650.00,
+            "currency": "INR",
+            "category": "OFFICE_SUPPLIES",
+            "description": "Notebook and stationery for Q2 planning",
+            "paidBy": "EMPLOYEE",
+            "expenseDate": now,
+            "status": "PENDING",
+            "currentStepOrder": 0,
+        }
+    )
+    await db.approvalstep.create(data={"expenseId": exp_pending4.id, "approverId": mgr_priya.id, "stepOrder": 0, "stepLabel": "Team Lead", "isRequired": True, "status": "AWAITING"})
+    await db.approvalstep.create(data={"expenseId": exp_pending4.id, "approverId": mgr_neha.id, "stepOrder": 1, "stepLabel": "Finance", "status": "PENDING"})
+    await db.approvalstep.create(data={"expenseId": exp_pending4.id, "approverId": mgr_arjun.id, "stepOrder": 2, "stepLabel": "Director", "status": "PENDING"})
+    print(f"  PENDING:     {exp_pending4.description} (Divya -> awaiting Priya)")
 
     await db.disconnect()
 
-    print("\n✓ Seed complete!")
-    print("\nTest accounts (all password: password123):")
-    print("  Admin:    admin@acme.com")
-    print("  Manager:  john@acme.com / sarah@acme.com / mitchell@acme.com")
-    print("  Employee: alice@acme.com / bob@acme.com / carol@acme.com")
-    print("\nJohn has 3 pending approvals to review.")
+    print("\n" + "=" * 60)
+    print("  SEED COMPLETE")
+    print("=" * 60)
+    print(f"\nCompany: TechNova Solutions (INR)")
+    print(f"\nAll passwords: {PASSWORD}")
+    print(f"\n{'Email':<28} {'Role':<10} {'Manager':<10}")
+    print("-" * 50)
+    print(f"{'admin@technova.com':<28} {'ADMIN':<10} {'—':<10}")
+    print(f"{'priya@technova.com':<28} {'MANAGER':<10} {'—':<10}")
+    print(f"{'arjun@technova.com':<28} {'MANAGER':<10} {'—':<10}")
+    print(f"{'neha@technova.com':<28} {'MANAGER':<10} {'—':<10}")
+    print(f"{'ankit@technova.com':<28} {'EMPLOYEE':<10} {'Priya':<10}")
+    print(f"{'divya@technova.com':<28} {'EMPLOYEE':<10} {'Priya':<10}")
+    print(f"{'rohan@technova.com':<28} {'EMPLOYEE':<10} {'Arjun':<10}")
+    print(f"{'meera@technova.com':<28} {'EMPLOYEE':<10} {'Arjun':<10}")
+    print(f"{'karan@technova.com':<28} {'EMPLOYEE':<10} {'Neha':<10}")
+    print(f"\n12 expenses: 1 draft, 4 pending, 2 in-progress, 3 approved, 2 rejected")
+    print(f"3 approval rules: sequential (default), parallel, hybrid")
+    print(f"\nPriya has 4 pending approvals to review.")
+    print(f"Neha has 2 in-progress expenses awaiting her action.")
 
 
 if __name__ == "__main__":
