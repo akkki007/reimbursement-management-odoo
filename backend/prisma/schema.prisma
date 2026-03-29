@@ -76,6 +76,11 @@ enum ExpenseCategory {
   OTHER
 }
 
+enum PaidBy {
+  EMPLOYEE
+  COMPANY
+}
+
 model Expense {
   id                String          @id @default(uuid())
   companyId         String
@@ -86,6 +91,8 @@ model Expense {
   exchangeRate      Decimal?        @db.Decimal(12, 6)
   category          ExpenseCategory
   description       String
+  remarks           String?
+  paidBy            PaidBy          @default(EMPLOYEE)
   receiptUrl        String?
   expenseDate       DateTime
   status            ExpenseStatus   @default(DRAFT)

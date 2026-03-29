@@ -9,6 +9,8 @@ class CreateExpenseRequest(BaseModel):
     currency: str
     category: str
     description: str
+    remarks: str | None = None
+    paid_by: str = "EMPLOYEE"
     expense_date: datetime
     is_manager_approver: bool = False
     receipt_url: str | None = None
@@ -21,6 +23,8 @@ class UpdateExpenseRequest(BaseModel):
     currency: str | None = None
     category: str | None = None
     description: str | None = None
+    remarks: str | None = None
+    paid_by: str | None = None
     expense_date: datetime | None = None
     is_manager_approver: bool | None = None
 

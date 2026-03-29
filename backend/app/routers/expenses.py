@@ -59,6 +59,8 @@ async def create_and_submit_expense(
         currency=req.currency,
         category=req.category,
         description=req.description,
+        remarks=req.remarks,
+        paid_by=req.paid_by,
         expense_date=req.expense_date,
         is_manager_approver=req.is_manager_approver,
         receipt_url=req.receipt_url,
