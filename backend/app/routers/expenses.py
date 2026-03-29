@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
 
 from app.dependencies import db
 from app.middleware.auth_middleware import get_current_user
@@ -10,8 +10,40 @@ from app.services.expense_service import (
     submit_expense,
     serialize_expense,
 )
+from app.services.ocr_service import parse_receipt
 
 router = APIRouter(prefix="/api/expenses", tags=["Expenses"])
+
+
+@router.get("/stats")
+async def get_expense_stats(current_user=Depends(get_current_user)):
+    """Dashboard stats: counts by status, total amounts."""
+    where_base = {"companyId": current_user.companyId}
+    if current_user.role == "EMPLOYEE":
+        where_base["submittedById"] = current_user.id
+
+    all_expenses = await db.expense.find_many(where=where_base)
+
+    counts = {"DRAFT": 0, "PENDING": 0, "IN_PROGRESS": 0, "APPROVED": 0, "REJECTED": 0}
+    total_amount = 0.0
+    for e in all_expenses:
+        counts[e.status] = counts.get(e.status, 0) + 1
+        total_amount += float(e.convertedAmount or e.amount)
+
+    # Pending approvals for this user
+    pending_approvals = 0
+    if current_user.role in ("MANAGER", "ADMIN"):
+        steps = await db.approvalstep.find_many(
+            where={"approverId": current_user.id, "status": "AWAITING"}
+        )
+        pending_approvals = len(steps)
+
+    return {
+        "counts": counts,
+        "total_submitted": len(all_expenses),
+        "total_amount": total_amount,
+        "pending_approvals": pending_approvals,
+    }
 
 
 @router.post("/")
@@ -180,3 +212,18 @@ async def update_expense(
         data=update_data,
     )
     return serialize_expense(updated)
+
+
+@router.post("/scan-receipt")
+async def scan_receipt(
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+):
+    """Upload a receipt image and get OCR-parsed fields."""
+    if not file.content_type or not (
+        file.content_type.startswith("image/") or file.content_type == "application/pdf"
+    ):
+        raise HTTPException(status_code=400, detail="Only images and PDFs are accepted")
+
+    result = await parse_receipt(file)
+    return result
